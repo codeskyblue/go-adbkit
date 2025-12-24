@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/codeskyblue/adbkit/tcpusb"
+	"github.com/codeskyblue/go-adbkit/tcpusb"
 )
 
 func main() {

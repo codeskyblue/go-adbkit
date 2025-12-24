@@ -39,7 +39,7 @@ package main
 
 import (
     "log"
-    "github.com/codeskyblue/adbkit/tcpusb"
+    "github.com/codeskyblue/go-adbkit/tcpusb"
 )
 
 func main() {
@@ -60,7 +60,7 @@ package main
 
 import (
     "log"
-    "github.com/codeskyblue/adbkit/tcpusb"
+    "github.com/codeskyblue/go-adbkit/tcpusb"
 )
 
 func main() {
@@ -94,7 +94,7 @@ package main
 import (
     "errors"
     "log"
-    "github.com/codeskyblue/adbkit/tcpusb"
+    "github.com/codeskyblue/go-adbkit/tcpusb"
 )
 
 func main() {
@@ -129,7 +129,7 @@ package main
 
 import (
     "log"
-    "github.com/codeskyblue/adbkit/tcpusb"
+    "github.com/codeskyblue/go-adbkit/tcpusb"
 )
 
 func main() {

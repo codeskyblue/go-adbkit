@@ -12,7 +12,7 @@ Go implementation of USB-to-TCP bridge for Android Debug Bridge (ADB).
 ## Installation
 
 ```bash
-go get github.com/codeskyblue/adbkit
+go get github.com/codeskyblue/go-adbkit
 ```
 
 ## Quick Start
@@ -41,7 +41,7 @@ package main
 
 import (
     "log"
-    "github.com/codeskyblue/adbkit/tcpusb"
+    "github.com/codeskyblue/go-adbkit/tcpusb"
 )
 
 func main() {
