@@ -29,8 +29,7 @@ type AuthHandler func(publicKey []byte) error
 
 // Socket represents a connection from an ADB client
 type Socket struct {
-	client        *adb.Client
-	serial        string
+	device        *adb.Device
 	conn          net.Conn
 	authHandler   AuthHandler
 	reader        *PacketReader
@@ -49,7 +48,7 @@ type Socket struct {
 }
 
 // NewSocket creates a new socket instance
-func NewSocket(client *adb.Client, serial string, conn net.Conn, authHandler AuthHandler) *Socket {
+func NewSocket(device *adb.Device, conn net.Conn, authHandler AuthHandler) *Socket {
 	if authHandler == nil {
 		authHandler = func(publicKey []byte) error {
 			// Default: always accept
@@ -58,8 +57,7 @@ func NewSocket(client *adb.Client, serial string, conn net.Conn, authHandler Aut
 	}
 
 	socket := &Socket{
-		client:        client,
-		serial:        serial,
+		device:        device,
 		conn:          conn,
 		authHandler:   authHandler,
 		reader:        NewPacketReader(conn),
@@ -274,14 +272,14 @@ func (s *Socket) handleOpenPacket(packet *Packet) error {
 	localID := s.remoteID.Next()
 	s.mu.Unlock()
 
-	if packet.Data == nil || len(packet.Data) < 2 {
+	if len(packet.Data) < 2 {
 		return fmt.Errorf("empty service name")
 	}
 
 	serviceName := packet.Data[:len(packet.Data)-1] // Remove null terminator
 	slog.Info("Calling service", "name", string(serviceName))
 
-	service := NewService(s.client, s.serial, localID, remoteID, s)
+	service := NewService(s.device, localID, remoteID, s)
 
 	if err := s.services.Insert(localID, service); err != nil {
 		return err
@@ -328,8 +326,12 @@ func (s *Socket) forwardServicePacket(packet *Packet) error {
 func (s *Socket) getDeviceID() []byte {
 	// Create a simple device ID
 	// In production, you should get actual device properties
+	serial, err := s.device.Serial()
+	if err != nil {
+		serial = "unknown"
+	}
 	deviceID := fmt.Sprintf("device::ro.product.name=adb-bridge;ro.product.model=%s;ro.product.device=%s;\x00",
-		s.serial, s.serial)
+		serial, serial)
 	return []byte(deviceID)
 }
 

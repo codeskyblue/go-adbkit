@@ -3,8 +3,10 @@ package adb
 import (
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 )
 
 // Connector is an interface that abstracts connection creation for testability
@@ -49,8 +51,8 @@ type Client struct {
 	connector Connector
 }
 
-// Device represents a device returned by `host:devices`
-type Device struct {
+// DeviceInfo represents a device returned by `host:devices`
+type DeviceInfo struct {
 	Serial string
 	State  string
 }
@@ -93,21 +95,29 @@ func defaultADBName() string {
 
 // NewClient creates a new Client with default options
 func NewClient() *Client {
-	return NewClientWithOptions(ClientOptions{
-		Host: "127.0.0.1",
-		Port: 5037,
-		Bin:  defaultADBName(),
-	})
+	return NewClientWithOptions(ClientOptions{})
+}
+
+func getEnvOrDefault(envVar, defaultVal string) string {
+	if val := os.Getenv(envVar); val != "" {
+		return val
+	}
+	return defaultVal
 }
 
 // NewClientWithOptions creates a new Client with custom options
 // It will automatically start the ADB server if connection fails
 func NewClientWithOptions(opts ClientOptions) *Client {
 	if opts.Host == "" {
-		opts.Host = "127.0.0.1"
+		opts.Host = getEnvOrDefault("ANDROID_ADB_SERVER_HOST", "127.0.0.1")
 	}
 	if opts.Port == 0 {
 		opts.Port = 5037
+		if portStr := os.Getenv("ANDROID_ADB_SERVER_PORT"); portStr != "" {
+			if port, err := strconv.Atoi(portStr); err == nil {
+				opts.Port = port
+			}
+		} 
 	}
 	if opts.Bin == "" {
 		opts.Bin = defaultADBName()
@@ -126,4 +136,16 @@ func NewClientWithOptions(opts ClientOptions) *Client {
 // NewClientWithConnector creates a new Client with a custom Connector (useful for testing)
 func NewClientWithConnector(connector Connector) *Client {
 	return &Client{connector: connector}
+}
+
+// Device returns a Device instance for interacting with a specific device
+// Use DeviceWithSerial() to create a descriptor for a specific device:
+//
+//	device := client.Device(adb.DeviceWithSerial("emulator-5554"))
+//	device.Shell("ls /sdcard")
+func (c *Client) Device(descriptor DeviceDescriptor) *Device {
+	return &Device{
+		client:     c,
+		descriptor: descriptor,
+	}
 }

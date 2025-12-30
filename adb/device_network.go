@@ -8,11 +8,11 @@ import (
 )
 
 // TcpIp switches the device to TCP/IP mode
-func (c *Client) TcpIp(serial string, port int) (bool, error) {
+func (d *Device) TcpIp(port int) (bool, error) {
 	if port == 0 {
 		port = 5555
 	}
-	transport, err := c.Transport(serial)
+	transport, err := d.Transport()
 	if err != nil {
 		return false, err
 	}
@@ -39,8 +39,8 @@ func (c *Client) TcpIp(serial string, port int) (bool, error) {
 }
 
 // Usb switches the device back to USB mode
-func (c *Client) Usb(serial string) (bool, error) {
-	transport, err := c.Transport(serial)
+func (d *Device) Usb() (bool, error) {
+	transport, err := d.Transport()
 	if err != nil {
 		return false, err
 	}
@@ -66,8 +66,8 @@ func (c *Client) Usb(serial string) (bool, error) {
 }
 
 // OpenLocal opens a local file/abstract socket on the device
-func (c *Client) OpenLocal(serial, path string) (net.Conn, error) {
-	transport, err := c.Transport(serial)
+func (d *Device) OpenLocal(path string) (net.Conn, error) {
+	transport, err := d.Transport()
 	if err != nil {
 		return nil, err
 	}
@@ -96,8 +96,8 @@ func (c *Client) OpenLocal(serial, path string) (net.Conn, error) {
 }
 
 // OpenLog opens a log buffer on the device
-func (c *Client) OpenLog(serial, name string) (net.Conn, error) {
-	transport, err := c.Transport(serial)
+func (d *Device) OpenLog(name string) (net.Conn, error) {
+	transport, err := d.Transport()
 	if err != nil {
 		return nil, err
 	}
@@ -126,8 +126,8 @@ func (c *Client) OpenLog(serial, name string) (net.Conn, error) {
 }
 
 // OpenTcp opens a TCP connection on the device
-func (c *Client) OpenTcp(serial string, port int, host string) (net.Conn, error) {
-	transport, err := c.Transport(serial)
+func (d *Device) OpenTcp(port int, host string) (net.Conn, error) {
+	transport, err := d.Transport()
 	if err != nil {
 		return nil, err
 	}

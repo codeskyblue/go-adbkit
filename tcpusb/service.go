@@ -14,8 +14,7 @@ import (
 
 // Service handles a single ADB service connection
 type Service struct {
-	client    *adb.Client
-	serial    string
+	device    *adb.Device
 	localID   uint32
 	remoteID  uint32
 	socket    *Socket
@@ -29,10 +28,9 @@ type Service struct {
 }
 
 // NewService creates a new service instance
-func NewService(client *adb.Client, serial string, localID, remoteID uint32, socket *Socket) *Service {
+func NewService(device *adb.Device, localID, remoteID uint32, socket *Socket) *Service {
 	return &Service{
-		client:   client,
-		serial:   serial,
+		device:   device,
 		localID:  localID,
 		remoteID: remoteID,
 		socket:   socket,
@@ -96,7 +94,7 @@ func (s *Service) handleOpenPacket(packet *Packet) error {
 	slog.Debug("I:A_OPEN", "packet", packet.String())
 
 	// Get transport connection
-	transport, err := s.client.Transport(s.serial)
+	transport, err := s.device.Transport()
 	if err != nil {
 		return err
 	}

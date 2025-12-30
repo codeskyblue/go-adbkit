@@ -159,7 +159,9 @@ func handleShell(client *adb.Client, args []string) {
 	// Auto-detect device if serial not specified
 	autoDetectDevice(client, serial)
 
-	output, err := client.RunCommand(*serial, command)
+	// New API: Use Device with Shell command
+	device := client.Device(adb.DeviceWithSerial(*serial))
+	output, err := device.RunCommand(command)
 	if err != nil {
 		log.Fatalf("Failed to execute shell command: %v", err)
 	}
@@ -184,7 +186,9 @@ func handleScreenshot(client *adb.Client, args []string) {
 
 	fmt.Printf("Taking screenshot from device %s...\n", *serial)
 
-	img, err := client.Screencap(*serial)
+	// New API: Use Device with Screencap command
+	device := client.Device(adb.DeviceWithSerial(*serial))
+	img, err := device.Screencap()
 	if err != nil {
 		log.Fatalf("Failed to take screenshot: %v", err)
 	}

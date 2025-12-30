@@ -11,8 +11,7 @@ import (
 
 // Server provides USB devices over TCP using a translating proxy
 type Server struct {
-	client      *adb.Client
-	serial      string
+	device      *adb.Device
 	authHandler AuthHandler
 	listener    net.Listener
 	connections []*Socket
@@ -21,10 +20,9 @@ type Server struct {
 }
 
 // NewServer creates a new TCP-USB bridge server
-func NewServer(client *adb.Client, serial string, authHandler AuthHandler) *Server {
+func NewServer(device *adb.Device, authHandler AuthHandler) *Server {
 	return &Server{
-		client:      client,
-		serial:      serial,
+		device:      device,
 		authHandler: authHandler,
 		connections: make([]*Socket, 0),
 		closed:      false,
@@ -59,7 +57,7 @@ func (srv *Server) Listen(address string) error {
 			continue
 		}
 
-		socket := NewSocket(srv.client, srv.serial, conn, srv.authHandler)
+		socket := NewSocket(srv.device, conn, srv.authHandler)
 
 		srv.mu.Lock()
 		srv.connections = append(srv.connections, socket)

@@ -76,20 +76,20 @@ func (c *Client) Disconnect(host string, port int) (string, error) {
 }
 
 // ListDevices returns the list of attached devices (host:devices)
-func (c *Client) ListDevices() ([]Device, error) {
+func (c *Client) ListDevices() ([]DeviceInfo, error) {
 	payload, err := c.SendHostCommand("host:devices")
 	if err != nil {
 		return nil, err
 	}
 	lines := strings.Split(strings.TrimSpace(string(payload)), "\n")
-	devices := make([]Device, 0, len(lines))
+	devices := make([]DeviceInfo, 0, len(lines))
 	for _, line := range lines {
 		if line == "" {
 			continue
 		}
 		parts := strings.Fields(line)
 		if len(parts) >= 2 {
-			devices = append(devices, Device{Serial: parts[0], State: parts[1]})
+			devices = append(devices, DeviceInfo{Serial: parts[0], State: parts[1]})
 		}
 	}
 	return devices, nil
@@ -147,7 +147,7 @@ func (c *Client) TrackDevices() (net.Conn, error) {
 }
 
 // TrackDevicesWithCallback tracks devices and calls the callback for each update
-func (c *Client) TrackDevicesWithCallback(callback func([]Device)) error {
+func (c *Client) TrackDevicesWithCallback(callback func([]DeviceInfo)) error {
 	conn, err := c.TrackDevices()
 	if err != nil {
 		return err
@@ -167,12 +167,12 @@ func (c *Client) TrackDevicesWithCallback(callback func([]Device)) error {
 }
 
 // parseDevicesList parses a device list line
-func parseDevicesList(line string) []Device {
+func parseDevicesList(line string) []DeviceInfo {
 	parts := strings.Fields(line)
-	devices := make([]Device, 0)
+	devices := make([]DeviceInfo, 0)
 	for i := 0; i < len(parts); i += 2 {
 		if i+1 < len(parts) {
-			devices = append(devices, Device{
+			devices = append(devices, DeviceInfo{
 				Serial: parts[i],
 				State:  parts[i+1],
 			})
@@ -221,3 +221,25 @@ func ParseHostPort(hostPort string, defaultPort int) (string, int, error) {
 	}
 	return hostPort, defaultPort, nil
 }
+
+// ListForwards lists all port forwards for all devices (host:list-forward)
+func (c *Client) ListForwards() ([]ForwardEntry, error) {
+	payload, err := c.SendHostCommand("host:list-forward")
+	if err != nil {
+		return nil, err
+	}
+	out := strings.TrimSpace(string(payload))
+	if out == "" {
+		return []ForwardEntry{}, nil
+	}
+	lines := strings.Split(out, "\n")
+	forwards := make([]ForwardEntry, 0, len(lines))
+	for _, line := range lines {
+		parts := strings.Fields(line)
+		if len(parts) >= 3 {
+			forwards = append(forwards, ForwardEntry{Serial: parts[0], Local: parts[1], Remote: parts[2]})
+		}
+	}
+	return forwards, nil
+}
+
