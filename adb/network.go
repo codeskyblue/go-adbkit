@@ -1,0 +1,156 @@
+package adb
+
+import (
+	"fmt"
+	"io"
+	"net"
+	"strings"
+)
+
+// TcpIp switches the device to TCP/IP mode
+func (c *Client) TcpIp(serial string, port int) (bool, error) {
+	if port == 0 {
+		port = 5555
+	}
+	transport, err := c.Transport(serial)
+	if err != nil {
+		return false, err
+	}
+	defer transport.Close()
+
+	cmd := fmt.Sprintf("tcpip:%d", port)
+	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
+		return false, err
+	}
+
+	reply := make([]byte, 4)
+	if _, err := transport.Read(reply); err != nil {
+		return false, err
+	}
+	if string(reply) == "OKAY" {
+		data, _ := io.ReadAll(transport)
+		return strings.Contains(string(data), "starting in"), nil
+	}
+	if string(reply) == "FAIL" {
+		msg, _ := readLengthPrefixed(transport)
+		return false, fmt.Errorf("tcpip failed: %s", string(msg))
+	}
+	return false, fmt.Errorf("unexpected reply: %s", string(reply))
+}
+
+// Usb switches the device back to USB mode
+func (c *Client) Usb(serial string) (bool, error) {
+	transport, err := c.Transport(serial)
+	if err != nil {
+		return false, err
+	}
+	defer transport.Close()
+
+	cmd := "usb:"
+	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
+		return false, err
+	}
+
+	reply := make([]byte, 4)
+	if _, err := transport.Read(reply); err != nil {
+		return false, err
+	}
+	if string(reply) == "OKAY" {
+		return true, nil
+	}
+	if string(reply) == "FAIL" {
+		msg, _ := readLengthPrefixed(transport)
+		return false, fmt.Errorf("usb failed: %s", string(msg))
+	}
+	return false, fmt.Errorf("unexpected reply: %s", string(reply))
+}
+
+// OpenLocal opens a local file/abstract socket on the device
+func (c *Client) OpenLocal(serial, path string) (net.Conn, error) {
+	transport, err := c.Transport(serial)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd := fmt.Sprintf("local:%s", path)
+	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
+		transport.Close()
+		return nil, err
+	}
+
+	reply := make([]byte, 4)
+	if _, err := transport.Read(reply); err != nil {
+		transport.Close()
+		return nil, err
+	}
+	if string(reply) == "OKAY" {
+		return transport, nil
+	}
+	if string(reply) == "FAIL" {
+		msg, _ := readLengthPrefixed(transport)
+		transport.Close()
+		return nil, fmt.Errorf("openLocal failed: %s", string(msg))
+	}
+	transport.Close()
+	return nil, fmt.Errorf("unexpected reply: %s", string(reply))
+}
+
+// OpenLog opens a log buffer on the device
+func (c *Client) OpenLog(serial, name string) (net.Conn, error) {
+	transport, err := c.Transport(serial)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd := fmt.Sprintf("log:%s", name)
+	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
+		transport.Close()
+		return nil, err
+	}
+
+	reply := make([]byte, 4)
+	if _, err := transport.Read(reply); err != nil {
+		transport.Close()
+		return nil, err
+	}
+	if string(reply) == "OKAY" {
+		return transport, nil
+	}
+	if string(reply) == "FAIL" {
+		msg, _ := readLengthPrefixed(transport)
+		transport.Close()
+		return nil, fmt.Errorf("openLog failed: %s", string(msg))
+	}
+	transport.Close()
+	return nil, fmt.Errorf("unexpected reply: %s", string(reply))
+}
+
+// OpenTcp opens a TCP connection on the device
+func (c *Client) OpenTcp(serial string, port int, host string) (net.Conn, error) {
+	transport, err := c.Transport(serial)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd := fmt.Sprintf("tcp:%s:%d", host, port)
+	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
+		transport.Close()
+		return nil, err
+	}
+
+	reply := make([]byte, 4)
+	if _, err := transport.Read(reply); err != nil {
+		transport.Close()
+		return nil, err
+	}
+	if string(reply) == "OKAY" {
+		return transport, nil
+	}
+	if string(reply) == "FAIL" {
+		msg, _ := readLengthPrefixed(transport)
+		transport.Close()
+		return nil, fmt.Errorf("openTcp failed: %s", string(msg))
+	}
+	transport.Close()
+	return nil, fmt.Errorf("unexpected reply: %s", string(reply))
+}

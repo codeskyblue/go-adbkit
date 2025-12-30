@@ -9,6 +9,8 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+
+	"github.com/codeskyblue/go-adbkit/adb"
 )
 
 const (
@@ -27,7 +29,7 @@ type AuthHandler func(publicKey []byte) error
 
 // Socket represents a connection from an ADB client
 type Socket struct {
-	client        ADBClient
+	client        *adb.Client
 	serial        string
 	conn          net.Conn
 	authHandler   AuthHandler
@@ -47,7 +49,7 @@ type Socket struct {
 }
 
 // NewSocket creates a new socket instance
-func NewSocket(client ADBClient, serial string, conn net.Conn, authHandler AuthHandler) *Socket {
+func NewSocket(client *adb.Client, serial string, conn net.Conn, authHandler AuthHandler) *Socket {
 	if authHandler == nil {
 		authHandler = func(publicKey []byte) error {
 			// Default: always accept

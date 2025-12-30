@@ -5,11 +5,13 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+
+	"github.com/codeskyblue/go-adbkit/adb"
 )
 
 // Server provides USB devices over TCP using a translating proxy
 type Server struct {
-	client      ADBClient
+	client      *adb.Client
 	serial      string
 	authHandler AuthHandler
 	listener    net.Listener
@@ -19,7 +21,7 @@ type Server struct {
 }
 
 // NewServer creates a new TCP-USB bridge server
-func NewServer(client ADBClient, serial string, authHandler AuthHandler) *Server {
+func NewServer(client *adb.Client, serial string, authHandler AuthHandler) *Server {
 	return &Server{
 		client:      client,
 		serial:      serial,
@@ -116,66 +118,5 @@ func (srv *Server) Addr() net.Addr {
 	if srv.listener != nil {
 		return srv.listener.Addr()
 	}
-	return nil
-}
-
-// DefaultADBClient provides a default ADB client implementation
-type DefaultADBClient struct {
-	host string
-	port int
-}
-
-// NewDefaultADBClient creates a new default ADB client
-func NewDefaultADBClient(host string, port int) *DefaultADBClient {
-	if host == "" {
-		host = "127.0.0.1"
-	}
-	if port == 0 {
-		port = 5037
-	}
-	return &DefaultADBClient{
-		host: host,
-		port: port,
-	}
-}
-
-// Transport establishes a transport connection to the specified device
-func (c *DefaultADBClient) Transport(serial string) (net.Conn, error) {
-	addr := fmt.Sprintf("%s:%d", c.host, c.port)
-	conn, err := net.Dial("tcp", addr)
-	if err != nil {
-		return nil, err
-	}
-
-	// Send transport command
-	cmd := fmt.Sprintf("host:transport:%s", serial)
-	if err := sendADBCommand(conn, cmd); err != nil {
-		conn.Close()
-		return nil, err
-	}
-
-	return conn, nil
-}
-
-// sendADBCommand sends a command to the ADB server
-func sendADBCommand(conn net.Conn, command string) error {
-	// Format: 4-byte hex length + command
-	length := fmt.Sprintf("%04x", len(command))
-	message := length + command
-
-	if _, err := conn.Write([]byte(message)); err != nil {
-		return err
-	}
-
-	// Read response (OKAY or FAIL)
-	response := make([]byte, 4)
-	if _, err := conn.Read(response); err != nil {
-		return err
-	}
-
-	if string(response) != "OKAY" {
-		return fmt.Errorf("ADB command failed: %s", string(response))
-	}
-
 	return nil
 }

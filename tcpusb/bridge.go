@@ -3,6 +3,8 @@ package tcpusb
 import (
 	"fmt"
 	"log/slog"
+
+	"github.com/codeskyblue/go-adbkit/adb"
 )
 
 // Config holds the configuration for a USB-to-TCP bridge
@@ -44,7 +46,7 @@ func NewBridge(serial string) *Bridge {
 
 // Start starts the USB-to-TCP bridge server
 func (b *Bridge) Start() error {
-	client := NewDefaultADBClient(b.Config.ADBHost, b.Config.ADBPort)
+	client := adb.NewClient(b.Config.ADBHost, b.Config.ADBPort)
 	server := NewServer(client, b.Serial, b.Config.AuthHandler)
 
 	address := fmt.Sprintf(":%d", b.Config.Port)
@@ -55,7 +57,7 @@ func (b *Bridge) Start() error {
 
 // StartWithServer starts the bridge and returns the server instance for manual control
 func (b *Bridge) StartWithServer() (*Server, error) {
-	client := NewDefaultADBClient(b.Config.ADBHost, b.Config.ADBPort)
+	client := adb.NewClient(b.Config.ADBHost, b.Config.ADBPort)
 	server := NewServer(client, b.Serial, b.Config.AuthHandler)
 
 	address := fmt.Sprintf(":%d", b.Config.Port)

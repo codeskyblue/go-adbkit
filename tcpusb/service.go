@@ -8,11 +8,13 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/codeskyblue/go-adbkit/adb"
 )
 
 // Service handles a single ADB service connection
 type Service struct {
-	client    ADBClient
+	client    *adb.Client
 	serial    string
 	localID   uint32
 	remoteID  uint32
@@ -26,13 +28,8 @@ type Service struct {
 	doneCh    chan struct{} // Signal when service is completely done
 }
 
-// ADBClient interface for interacting with ADB
-type ADBClient interface {
-	Transport(serial string) (net.Conn, error)
-}
-
 // NewService creates a new service instance
-func NewService(client ADBClient, serial string, localID, remoteID uint32, socket *Socket) *Service {
+func NewService(client *adb.Client, serial string, localID, remoteID uint32, socket *Socket) *Service {
 	return &Service{
 		client:   client,
 		serial:   serial,
