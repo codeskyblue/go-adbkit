@@ -46,7 +46,10 @@ func NewBridge(serial string) *Bridge {
 
 // Start starts the USB-to-TCP bridge server
 func (b *Bridge) Start() error {
-	client := adb.NewClient(b.Config.ADBHost, b.Config.ADBPort)
+	client := adb.NewClientWithOptions(adb.ClientOptions{
+		Host: b.Config.ADBHost,
+		Port: b.Config.ADBPort,
+	})
 	server := NewServer(client, b.Serial, b.Config.AuthHandler)
 
 	address := fmt.Sprintf(":%d", b.Config.Port)
@@ -57,7 +60,10 @@ func (b *Bridge) Start() error {
 
 // StartWithServer starts the bridge and returns the server instance for manual control
 func (b *Bridge) StartWithServer() (*Server, error) {
-	client := adb.NewClient(b.Config.ADBHost, b.Config.ADBPort)
+	client := adb.NewClientWithOptions(adb.ClientOptions{
+		Host: b.Config.ADBHost,
+		Port: b.Config.ADBPort,
+	})
 	server := NewServer(client, b.Serial, b.Config.AuthHandler)
 
 	address := fmt.Sprintf(":%d", b.Config.Port)

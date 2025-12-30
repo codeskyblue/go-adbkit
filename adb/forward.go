@@ -3,14 +3,12 @@ package adb
 import (
 	"fmt"
 	"io"
-	"net"
 	"strings"
 )
 
 // Forward creates a port forward on the server for the given device serial.
 func (c *Client) Forward(serial, local, remote string) (bool, error) {
-	addr := c.addr()
-	conn, err := net.Dial("tcp", addr)
+	conn, err := c.Connection()
 	if err != nil {
 		return false, err
 	}

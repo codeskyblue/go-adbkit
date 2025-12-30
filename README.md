@@ -1,13 +1,16 @@
 # go-adbkit
 
-Go implementation of USB-to-TCP bridge for Android Debug Bridge (ADB).
+A pure Go client library for the Android Debug Bridge (ADB) protocol.
 
 ## Features
 
-- **USB-to-TCP Bridge**: Expose USB-connected Android devices over TCP network
-- **Multiple Devices**: Support for bridging multiple devices simultaneously
-- **Authentication**: Customizable authentication handlers
-- **Clean API**: Simple and intuitive Go API for easy integration
+- **Pure Go Implementation**: No external dependencies on ADB binaries
+- **Comprehensive API Support**:
+  - Host commands: version, devices, connect, disconnect, kill
+  - Device commands: shell, file sync, port forwarding, logcat
+  - Transport management
+- **Simple & Clean API**: Easy to use and integrate into your Go projects
+- **Testable**: Mock-friendly design with connector interface for testing
 
 ## Installation
 
@@ -17,200 +20,271 @@ go get github.com/codeskyblue/go-adbkit
 
 ## Quick Start
 
-### Command Line Tool
-
-```bash
-# Build the command line tool
-cd cmd/usb-bridge
-go build
-
-# Run the bridge for a specific device
-./usb-bridge -serial <device-serial> -port 6174
-
-# Run with verbose logging (shows ADB protocol debug messages)
-./usb-bridge -serial <device-serial> -port 6174 --verbose
-
-# Connect from another machine
-adb connect <your-ip>:6174
-```
-
-### As a Library
+### Basic Usage
 
 ```go
 package main
 
 import (
+    "fmt"
     "log"
-    "github.com/codeskyblue/go-adbkit/tcpusb"
+    "github.com/codeskyblue/go-adbkit/adb"
 )
 
 func main() {
-    // Create a bridge for your device
-    bridge := tcpusb.NewBridge("your-device-serial")
-    bridge.Config.Port = 6174
-    
-    // Start the bridge (blocking)
-    if err := bridge.Start(); err != nil {
+    // Create a new ADB client (connects to localhost:5037 by default)
+    client := adb.NewClient()
+
+    // Get ADB server version
+    version, err := client.Version()
+    if err != nil {
         log.Fatal(err)
     }
-}
-```
+    fmt.Printf("ADB version: %d\n", version)
 
-## API Documentation
-
-### Creating a Bridge
-
-```go
-// Simple bridge with defaults (port 6174, localhost ADB server)
-bridge := tcpusb.NewBridge("device-serial")
-
-// Bridge with custom configuration
-bridge := tcpusb.NewBridge("device-serial")
-bridge.Config.Port = 7000                // Custom port
-bridge.Config.ADBHost = "192.168.1.100"  // Remote ADB server
-bridge.Config.ADBPort = 5037              // Custom ADB port
-bridge.Config.AuthHandler = myAuthFunc    // Custom authentication
-```
-
-### Configuration
-
-- **Port**: TCP port for the bridge server (default: 6174)
-- **ADBHost**: ADB server host (default: "127.0.0.1")
-- **ADBPort**: ADB server port (default: 5037)
-- **AuthHandler**: Custom authentication handler function
-
-### Starting the Bridge
-
-```go
-// Blocking call - starts server and handles connections
-err := bridge.Start()
-
-// Non-blocking - returns server instance for manual control
-server, err := bridge.StartWithServer()
-defer server.Close()
-```
-
-### Custom Authentication
-
-```go
-authHandler := func(publicKey []byte) error {
-    // Verify the public key
-    // Return nil to accept, error to reject
-    log.Printf("Device with key %x attempting to connect", publicKey[:20])
-    
-    if isAuthorized(publicKey) {
-        return nil
+    // List connected devices
+    devices, err := client.ListDevices()
+    if err != nil {
+        log.Fatal(err)
     }
-    return errors.New("unauthorized device")
+    for _, device := range devices {
+        fmt.Printf("Device: %s (%s)\n", device.Serial, device.State)
+    }
+}
+```
+
+### Running Shell Commands
+
+```go
+// Get a device shell client
+deviceClient := client.DeviceClient("device-serial")
+
+// Run a shell command
+output, err := deviceClient.RunCommand("getprop ro.product.model")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Device model: %s\n", output)
+```
+
+### File Operations
+
+```go
+deviceClient := client.DeviceClient("device-serial")
+
+// List files
+entries, err := deviceClient.List("/sdcard/")
+if err != nil {
+    log.Fatal(err)
+}
+for _, entry := range entries {
+    fmt.Printf("%s %d %s\n", entry.Mode, entry.Size, entry.Name)
 }
 
-bridge := tcpusb.NewBridge("serial", 
-    tcpusb.WithAuthHandler(authHandler),
-)
-```
-
-## Use Cases
-
-### 1. Remote Development
-Access USB-connected Android devices over the network for remote development and testing.
-
-```go
-bridge := tcpusb.NewBridge("device-serial", 
-    tcpusb.WithPort(6174),
-)
-bridge.Start()
-
-// On remote machine:
-// adb connect <server-ip>:6174
-```
-
-### 2. CI/CD Integration
-Integrate physical devices into your CI/CD pipeline by exposing them over TCP.
-
-```go
-// In your CI server
-server, err := bridge.StartWithServer()
+// Pull file from device
+err = deviceClient.Pull("/sdcard/file.txt", "/local/path/file.txt")
 if err != nil {
     log.Fatal(err)
 }
 
-// Run your tests
-runTests()
-
-// Clean up
-server.Close()
+// Push file to device
+err = deviceClient.Push("/local/path/file.txt", "/sdcard/file.txt")
+if err != nil {
+    log.Fatal(err)
+}
 ```
 
-### 3. Device Farm
-Create a device farm by bridging multiple devices on different ports.
+### Port Forwarding
 
 ```go
-devices := []string{"device1", "device2", "device3"}
-port := 6174
-
-for _, serial := range devices {
-    bridge := tcpusb.NewBridge(serial, 
-        tcpusb.WithPort(port),
-    )
-    go bridge.Start()
-    port++
+// Forward local port to device
+err := client.Forward("device-serial", "tcp:8080", "tcp:8080")
+if err != nil {
+    log.Fatal(err)
 }
+
+// List forwardings
+forwards, err := client.ListForward("device-serial")
+if err != nil {
+    log.Fatal(err)
+}
+for _, fwd := range forwards {
+    fmt.Printf("%s -> %s\n", fwd.Local, fwd.Remote)
+}
+
+// Remove forwarding
+err = client.ForwardRemove("device-serial", "tcp:8080")
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Device Tracking
+
+```go
+// Track device changes with callback
+err := client.TrackDevicesWithCallback(func(devices []adb.Device) {
+    fmt.Printf("Devices changed: %d devices\n", len(devices))
+    for _, dev := range devices {
+        fmt.Printf("  %s: %s\n", dev.Serial, dev.State)
+    }
+})
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+## API Reference
+
+### Client
+
+#### Creating a Client
+
+```go
+// Default client (localhost:5037)
+client := adb.NewClient()
+
+// With options (auto-starts ADB server if needed)
+client := adb.NewClientWithOptions(adb.ClientOptions{
+    Host: "127.0.0.1",
+    Port: 5037,
+    Bin:  "adb", // Path to adb binary
+})
+
+// With custom connector (useful for testing)
+client := adb.NewClientWithConnector(customConnector)
+```
+
+#### Host Commands
+
+```go
+// Get ADB server version
+version, err := client.Version()
+
+// List connected devices
+devices, err := client.ListDevices()
+// Returns: []Device{Serial: "xxx", State: "device"}
+
+// List devices with paths
+devices, err := client.ListDevicesWithPaths()
+// Returns: []DeviceWithPath{Serial, State, Model, Device}
+
+// Connect to remote device
+msg, err := client.Connect("192.168.1.100", 5555)
+
+// Disconnect from remote device
+msg, err := client.Disconnect("192.168.1.100", 5555)
+
+// Kill ADB server
+ok, err := client.Kill()
+```
+
+#### Device Commands
+
+```go
+// Get device serial
+serial, err := client.GetSerialNo("device-serial")
+
+// Get device path
+path, err := client.GetDevicePath("device-serial")
+
+// Get device state
+state, err := client.GetState("device-serial")
+
+// Get device features
+features, err := client.GetFeatures("device-serial")
+// Returns: map[string]string
+```
+
+#### Port Forwarding
+
+```go
+// Forward local port to device
+err := client.Forward("device-serial", "tcp:8080", "tcp:8080")
+
+// List all forwards for a device
+forwards, err := client.ListForward("device-serial")
+
+// Remove specific forward
+err := client.ForwardRemove("device-serial", "tcp:8080")
+
+// Remove all forwards for a device
+err := client.ForwardRemoveAll("device-serial")
+```
+
+### DeviceClient
+
+For device-specific operations, use `DeviceClient`:
+
+```go
+deviceClient := client.DeviceClient("device-serial")
+
+// Run shell command
+output, err := deviceClient.RunCommand("ls /sdcard")
+
+// Get screen orientation
+orientation, err := deviceClient.GetScreenOrientation()
+
+// Get property value
+value, err := deviceClient.GetProperty("ro.product.model")
+
+// File operations
+entries, err := deviceClient.List("/sdcard/")
+err = deviceClient.Pull("/sdcard/file.txt", "local.txt")
+err = deviceClient.Push("local.txt", "/sdcard/file.txt")
+
+// Logcat
+logcat, err := deviceClient.Logcat()
+// Returns: net.Conn that streams log output
+```
+
+## Testing
+
+The library includes comprehensive test coverage using mock connections. See [DEVELOP.md](DEVELOP.md) for how to write tests.
+
+```bash
+# Run tests
+go test ./adb/...
+
+# Run with coverage
+go test -cover ./adb/...
 ```
 
 ## Architecture
 
-The implementation follows the ADB protocol specification:
+The library implements the ADB protocol as specified in [AOSP](https://android.googlesource.com/platform/system/core/+/master/adb/PROTOCOL.TXT):
 
-1. **Packet Layer**: Handles ADB protocol packets (SYNC, CNXN, OPEN, OKAY, WRTE, CLSE, AUTH)
-2. **Socket Layer**: Manages client connections and authentication
-3. **Service Layer**: Forwards data between TCP clients and USB devices
-4. **Server Layer**: Accepts TCP connections and creates socket handlers
+1. **Connection Layer**: Manages TCP connections to ADB server
+2. **Protocol Layer**: Handles ADB wire protocol (length-prefixed messages)
+3. **Command Layer**: Implements host and device commands
+4. **Transport Layer**: Manages device-specific transports
 
 ```
-TCP Client (adb) <-> Socket <-> Service <-> ADB Server <-> USB Device
+Your App -> Client -> ADB Protocol -> ADB Server -> Device
 ```
-
-## Comparison with Node.js Implementation
-
-This is a port of the `usb-device-to-tcp` feature from [openstf/adbkit](https://github.com/openstf/adbkit).
-
-**Advantages of Go implementation:**
-- No runtime dependencies (single binary)
-- Better performance and lower memory usage
-- Type safety
-- Easy deployment
-- Built-in concurrency support
-
-## Examples
-
-See the [examples](./examples) directory for more usage examples:
-
-- [basic](./examples/basic) - Basic usage examples
-- More examples coming soon...
 
 ## Requirements
 
 - Go 1.18 or later
-- ADB server running (usually started by Android SDK)
-- USB-connected Android device
+- ADB server running (usually started by Android SDK Platform Tools)
 
 ## Troubleshooting
 
-**Bridge won't start:**
-- Make sure ADB server is running: `adb start-server`
-- Check if the port is already in use: `lsof -i :<port>`
+**Connection refused:**
+- Start ADB server: `adb start-server`
+- Check if ADB server is running: `adb devices`
 
-**Can't connect from remote machine:**
-- Ensure firewall allows connections on the bridge port
-- Verify the device serial is correct: `adb devices`
+**Device not found:**
+- Check if device is connected: `adb devices`
+- Verify device serial is correct
 
-**Device not authorized:**
-- Accept the authorization prompt on the Android device
-- Or implement a custom auth handler to auto-accept
+**Permission denied:**
+- Make sure your user has permission to access ADB
+- On Linux, you may need to configure udev rules
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please see [DEVELOP.md](DEVELOP.md) for development guidelines.
 
 ## License
 

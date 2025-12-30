@@ -7,11 +7,7 @@ import (
 
 // Connection creates a new connection to the adb server
 func (c *Client) Connection() (net.Conn, error) {
-	return net.Dial("tcp", c.addr())
-}
-
-func (c *Client) addr() string {
-	return fmt.Sprintf("%s:%d", c.Host, c.Port)
+	return c.connector.Connection()
 }
 
 // sendADBCommand writes a length-prefixed command and reads the 4-byte status (OKAY/FAIL)

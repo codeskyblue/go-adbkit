@@ -10,7 +10,7 @@ import (
 
 // SendHostCommand sends a "host:*" command to the adb server and returns the payload
 func (c *Client) SendHostCommand(cmd string) ([]byte, error) {
-	conn, err := net.Dial("tcp", c.addr())
+	conn, err := c.Connection()
 	if err != nil {
 		return nil, err
 	}
@@ -37,13 +37,22 @@ func (c *Client) SendHostCommand(cmd string) ([]byte, error) {
 	return payload, nil
 }
 
-// Version returns the adb server version string (as returned by host:version)
-func (c *Client) Version() (string, error) {
+// Version returns the adb server version as integer (as returned by host:version)
+// The version format is "00040029" which means version 4.41
+// Returns the integer representation: 0x00040029 = 263305
+func (c *Client) Version() (int, error) {
 	payload, err := c.SendHostCommand("host:version")
 	if err != nil {
-		return "", err
+		return 0, err
 	}
-	return strings.TrimSpace(string(payload)), nil
+	versionStr := strings.TrimSpace(string(payload))
+
+	version, err := parseHexInt(versionStr)
+	if err != nil {
+		return 0, fmt.Errorf("invalid version format %q: %w", versionStr, err)
+	}
+
+	return int(version), nil
 }
 
 // Connect connects to a remote adb device (host:connect:host:port)

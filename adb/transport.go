@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 )
 
 // Transport establishes a transport to the given serial and returns the live connection
 func (c *Client) Transport(serial string) (net.Conn, error) {
-	conn, err := net.Dial("tcp", c.addr())
+	conn, err := c.Connection()
 	if err != nil {
 		return nil, err
 	}
@@ -53,20 +54,9 @@ func readLengthPrefixed(r io.Reader) ([]byte, error) {
 
 // parseHexInt parses a 4-digit hex string to integer
 func parseHexInt(s string) (int64, error) {
-	var result int64
-	for _, c := range s {
-		var v int64
-		switch {
-		case c >= '0' && c <= '9':
-			v = int64(c - '0')
-		case c >= 'a' && c <= 'f':
-			v = int64(c - 'a' + 10)
-		case c >= 'A' && c <= 'F':
-			v = int64(c - 'A' + 10)
-		default:
-			return 0, fmt.Errorf("invalid hex digit: %c", c)
-		}
-		result = result*16 + v
+	result, err := strconv.ParseInt(s, 16, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid hex string %q: %w", s, err)
 	}
 	return result, nil
 }

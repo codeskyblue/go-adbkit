@@ -239,7 +239,7 @@ func (c *Client) Root(serial string) (bool, error) {
 		if strings.Contains(out, "restarting adbd as root") {
 			return true, nil
 		}
-		return false, fmt.Errorf(strings.TrimSpace(out))
+		return false, fmt.Errorf("%s", strings.TrimSpace(out))
 	}
 	if string(reply) == "FAIL" {
 		msg, _ := readLengthPrefixed(transport)
