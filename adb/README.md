@@ -69,12 +69,12 @@ The codebase has been organized into modular files for better maintainability:
   - `Reverse()` - Create reverse port forward
   - `ListReverses()` - List reverse forwards
 
-- **network.go** - Network operations
+- **device_network.go** - Network operations
   - `TcpIp()` - Switch to TCP/IP mode
   - `Usb()` - Switch back to USB mode
   - `OpenLocal()` - Open local socket
   - `OpenLog()` - Open log buffer
-  - `OpenTcp()` - Open TCP connection
+  - `OpenSocket()` - Open socket connection (supports tcp:, local:, localabstract:, etc.)
 
 - **file_operations.go** - File operations
   - `Stat()` - Get file information

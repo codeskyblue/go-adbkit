@@ -1,6 +1,7 @@
 package adb
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -125,14 +126,26 @@ func (d *Device) OpenLog(name string) (net.Conn, error) {
 	return nil, fmt.Errorf("unexpected reply: %s", string(reply))
 }
 
-// OpenTcp opens a TCP connection on the device
-func (d *Device) OpenTcp(port int, host string) (net.Conn, error) {
-	transport, err := d.Transport()
+// OpenSocket opens a socket connection to a specific address on the device
+// The address format can be:
+//   - "tcp:port" (e.g., "tcp:5555")
+//   - "tcp:host:port" (e.g., "tcp:192.168.1.100:5555")
+//   - "local:name" (e.g., "local:/dev/socket/adb")
+//   - "localabstract:name" (e.g., "localabstract:scrcpy")
+//   - "localreserved:name"
+//   - "localfilesystem:name"
+func (d *Device) OpenSocket(addr string) (net.Conn, error) {
+	return d.OpenSocketContext(context.Background(), addr)
+}
+
+// OpenSocketContext opens a socket connection to a specific address on the device with context support
+func (d *Device) OpenSocketContext(ctx context.Context, addr string) (net.Conn, error) {
+	transport, err := d.TransportContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	cmd := fmt.Sprintf("tcp:%s:%d", host, port)
+	cmd := addr
 	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
 		transport.Close()
 		return nil, err
@@ -143,13 +156,13 @@ func (d *Device) OpenTcp(port int, host string) (net.Conn, error) {
 		transport.Close()
 		return nil, err
 	}
-	if string(reply) == "OKAY" {
+	if string(reply) ==  StatusOkay {
 		return transport, nil
 	}
-	if string(reply) == "FAIL" {
+	if string(reply) == StatusFail {
 		msg, _ := readLengthPrefixed(transport)
 		transport.Close()
-		return nil, fmt.Errorf("openTcp failed: %s", string(msg))
+		return nil, fmt.Errorf("openSocket failed: %s", string(msg))
 	}
 	transport.Close()
 	return nil, fmt.Errorf("unexpected reply: %s", string(reply))
