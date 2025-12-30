@@ -1,51 +1,204 @@
 package main
 
 import (
+	"flag"
+	"fmt"
+	"image/png"
 	"log"
+	"os"
+	"strings"
 
-	"github.com/codeskyblue/go-adbkit/tcpusb"
+	"github.com/codeskyblue/go-adbkit/adb"
 )
 
+// cli program
+// support the following commands
+// $0 devices
+// $0 kill-server
+// $0 shell <command>
+// $0 screenshot [-s <serial>] [-o <output file>]
+
 func main() {
-	// Example 1: Simple usage with default settings
-	log.Println("Example 1: Simple bridge")
-	bridge := tcpusb.NewBridge("your-device-serial")
+	if len(os.Args) < 2 {
+		printUsage()
+		os.Exit(1)
+	}
 
-	server, err := bridge.StartWithServer()
+	command := os.Args[1]
+
+	// Create ADB client
+	client := adb.NewClient()
+
+	switch command {
+	case "devices":
+		listDevices(client)
+	case "kill-server":
+		killServer(client)
+	case "shell":
+		handleShell(client, os.Args[2:])
+	case "screenshot":
+		handleScreenshot(client, os.Args[2:])
+	case "-h", "--help", "help":
+		printUsage()
+	default:
+		fmt.Printf("Unknown command: %s\n", command)
+		printUsage()
+		os.Exit(1)
+	}
+}
+
+func printUsage() {
+	fmt.Println("ADB command-line tool")
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println("  basic devices                - List connected devices")
+	fmt.Println("  basic kill-server             - Kill ADB server")
+	fmt.Println("  basic shell <command>        - Execute shell command")
+	fmt.Println("  basic screenshot [options]   - Take screenshot")
+	fmt.Println()
+	fmt.Println("Shell Command:")
+	fmt.Println("  -s <serial>    Device serial number (auto-detect if only one device)")
+	fmt.Println("  <command>      Shell command to execute")
+	fmt.Println()
+	fmt.Println("Screenshot Options:")
+	fmt.Println("  -s <serial>    Device serial number (auto-detect if only one device)")
+	fmt.Println("  -o <output>    Output file path (default: screenshot.png)")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  basic devices")
+	fmt.Println("  basic kill-server")
+	fmt.Println("  basic shell getprop ro.product.model")
+	fmt.Println("  basic shell -s emulator-5554 ls /sdcard")
+	fmt.Println("  basic screenshot                           # Auto-detect device")
+	fmt.Println("  basic screenshot -s emulator-5554           # Specify device")
+	fmt.Println("  basic screenshot -s emulator-5554 -o screen.png")
+}
+
+func listDevices(client *adb.Client) {
+	devices, err := client.ListDevices()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to list devices: %v", err)
 	}
-	defer server.Close()
 
-	// Example 2: Custom port and ADB settings
-	log.Println("\nExample 2: Bridge with custom settings")
-	bridge2 := tcpusb.NewBridge("another-device-serial")
-	bridge2.Config.Port = 7000
-	bridge2.Config.ADBHost = "192.168.1.100"
-	bridge2.Config.ADBPort = 5037
+	if len(devices) == 0 {
+		fmt.Println("No devices found")
+		return
+	}
 
-	server2, err := bridge2.StartWithServer()
+	fmt.Printf("Found %d device(s):\n", len(devices))
+	for _, dev := range devices {
+		fmt.Printf("  %s\t%s\n", dev.Serial, dev.State)
+	}
+}
+
+func killServer(client *adb.Client) {
+	ok, err := client.Kill()
 	if err != nil {
-		log.Fatal(err)
-	}
-	defer server2.Close()
-
-	// Example 3: Custom authentication handler
-	log.Println("\nExample 3: Bridge with custom auth")
-	bridge3 := tcpusb.NewBridge("secure-device-serial")
-	bridge3.Config.Port = 8000
-	bridge3.Config.AuthHandler = func(publicKey []byte) error {
-		log.Printf("Device attempting to connect with public key: %x", publicKey[:20])
-		return nil
+		log.Fatalf("Failed to kill server: %v", err)
 	}
 
-	server3, err := bridge3.StartWithServer()
+	if ok {
+		fmt.Println("ADB server killed successfully")
+	} else {
+		fmt.Println("Failed to kill ADB server")
+	}
+}
+
+// autoDetectDevice auto-detects device serial if not specified
+// Returns the device serial to use
+func autoDetectDevice(client *adb.Client, serial *string) {
+	if *serial != "" {
+		return
+	}
+
+	devices, err := client.ListDevices()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to list devices: %v", err)
 	}
-	defer server3.Close()
 
-	// Keep the program running
-	log.Println("\nAll bridges started. Press Ctrl+C to exit.")
-	select {}
+	if len(devices) == 0 {
+		fmt.Println("Error: No devices found")
+		os.Exit(1)
+	}
+
+	if len(devices) > 1 {
+		fmt.Println("Error: Multiple devices found, please specify serial with -s")
+		fmt.Println()
+		fmt.Println("Available devices:")
+		for _, dev := range devices {
+			fmt.Printf("  %s\t%s\n", dev.Serial, dev.State)
+		}
+		os.Exit(1)
+	}
+
+	*serial = devices[0].Serial
+}
+
+func handleShell(client *adb.Client, args []string) {
+	fs := flag.NewFlagSet("shell", flag.ExitOnError)
+	serial := fs.String("s", "", "Device serial number (auto-detect if only one device)")
+
+	if err := fs.Parse(args); err != nil {
+		log.Fatalf("Failed to parse arguments: %v", err)
+	}
+
+	// Get remaining args as command
+	commandArgs := fs.Args()
+	if len(commandArgs) == 0 {
+		fmt.Println("Error: Shell command is required")
+		fmt.Println()
+		fs.Usage()
+		fmt.Println()
+		fmt.Println("Example: basic shell getprop ro.product.model")
+		fmt.Println("         basic shell -s emulator-5554 ls /sdcard")
+		os.Exit(1)
+	}
+
+	command := strings.Join(commandArgs, " ")
+
+	// Auto-detect device if serial not specified
+	autoDetectDevice(client, serial)
+
+	output, err := client.RunCommand(*serial, command)
+	if err != nil {
+		log.Fatalf("Failed to execute shell command: %v", err)
+	}
+
+	fmt.Print(output)
+}
+
+func handleScreenshot(client *adb.Client, args []string) {
+	fs := flag.NewFlagSet("screenshot", flag.ExitOnError)
+	serial := fs.String("s", "", "Device serial number (auto-detect if only one device)")
+	output := fs.String("o", "screenshot.png", "Output file path")
+
+	if err := fs.Parse(args); err != nil {
+		log.Fatalf("Failed to parse arguments: %v", err)
+	}
+
+	// Auto-detect device if serial not specified
+	if *serial == "" {
+		autoDetectDevice(client, serial)
+		fmt.Printf("Auto-detected device: %s\n", *serial)
+	}
+
+	fmt.Printf("Taking screenshot from device %s...\n", *serial)
+
+	img, err := client.Screencap(*serial)
+	if err != nil {
+		log.Fatalf("Failed to take screenshot: %v", err)
+	}
+
+	// Save image to file
+	f, err := os.Create(*output)
+	if err != nil {
+		log.Fatalf("Failed to create output file: %v", err)
+	}
+	defer f.Close()
+
+	if err := png.Encode(f, img); err != nil {
+		log.Fatalf("Failed to encode image: %v", err)
+	}
+
+	fmt.Printf("Screenshot saved to: %s\n", *output)
 }

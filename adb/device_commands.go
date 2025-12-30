@@ -2,11 +2,18 @@ package adb
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"image"
+	"image/color"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"net"
+	"os"
 	"strings"
 	"time"
 )
@@ -355,75 +362,87 @@ func (c *Client) TrackJdwp(serial string) (net.Conn, error) {
 	return nil, fmt.Errorf("unexpected reply: %s", string(reply))
 }
 
-// Framebuffer requests the device framebuffer and returns a reader and metadata
-func (c *Client) Framebuffer(serial, format string) (io.ReadCloser, map[string]uint32, error) {
+// Framebuffer requests the device framebuffer and returns an image.Image
+func (c *Client) Framebuffer(serial string) (image.Image, error) {
 	transport, err := c.Transport(serial)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
+	defer transport.Close()
+
 	cmd := "framebuffer:"
 	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
-		transport.Close()
-		return nil, nil, err
+		return nil, err
 	}
+
 	reply := make([]byte, 4)
 	if _, err := transport.Read(reply); err != nil {
-		transport.Close()
-		return nil, nil, err
+		return nil, err
 	}
-	if string(reply) == "OKAY" {
-		header := make([]byte, 52)
-		if _, err := io.ReadFull(transport, header); err != nil {
-			transport.Close()
-			return nil, nil, err
-		}
-		meta := make(map[string]uint32)
-		offset := 0
-		fields := []string{"version", "bpp", "size", "width", "height", "red_offset", "red_length", "blue_offset", "blue_length", "green_offset", "green_length", "alpha_offset", "alpha_length"}
-		for i := 0; i < len(fields); i++ {
-			meta[fields[i]] = binary.LittleEndian.Uint32(header[offset : offset+4])
-			offset += 4
-		}
-		// format detection
-		formatStr := "rgb"
-		if meta["blue_offset"] == 0 {
-			formatStr = "bgr"
-		}
-		if meta["bpp"] == 32 || meta["alpha_length"] != 0 {
-			formatStr += "a"
-		}
-		meta["format"] = 0 // placeholder, keep numeric meta only
-		// Return transport as reader; caller must Close
-		return transport, meta, nil
-	}
+
 	if string(reply) == "FAIL" {
 		msg, _ := readLengthPrefixed(transport)
-		transport.Close()
-		return nil, nil, fmt.Errorf("framebuffer failed: %s", string(msg))
+		return nil, fmt.Errorf("framebuffer failed: %s", string(msg))
 	}
-	transport.Close()
-	return nil, nil, fmt.Errorf("unexpected reply: %s", string(reply))
+
+	if string(reply) != "OKAY" {
+		return nil, fmt.Errorf("unexpected reply: %s", string(reply))
+	}
+
+	// Read header
+	header := make([]byte, 52)
+	if _, err := io.ReadFull(transport, header); err != nil {
+		return nil, err
+	}
+
+	// Parse metadata
+	meta := make(map[string]uint32)
+	offset := 0
+	fields := []string{"version", "bpp", "size", "width", "height", "red_offset", "red_length", "blue_offset", "blue_length", "green_offset", "green_length", "alpha_offset", "alpha_length"}
+	for i := 0; i < len(fields); i++ {
+		meta[fields[i]] = binary.LittleEndian.Uint32(header[offset : offset+4])
+		offset += 4
+	}
+
+	width := int(meta["width"])
+	height := int(meta["height"])
+	bpp := int(meta["bpp"])
+
+	// Read pixel data
+	pixelData := make([]byte, meta["size"])
+	if _, err := io.ReadFull(transport, pixelData); err != nil {
+		return nil, err
+	}
+
+	// Create image based on format
+	return decodeFramebuffer(pixelData, width, height, bpp, meta)
 }
 
-// Screencap runs screencap and returns the raw PNG stream (caller must Close)
-func (c *Client) Screencap(serial string) (net.Conn, error) {
-	// Use shell-based screencap command similar to CoffeeScript
-	cmd := "echo && screencap -p 2>/dev/null"
-	return c.Shell(serial, cmd)
-}
-
-// ScreencapWithFallback tries screencap and falls back to framebuffer if it fails
-func (c *Client) ScreencapWithFallback(serial string) (net.Conn, error) {
-	conn, err := c.Screencap(serial)
+// Screencap runs screencap and returns an image.Image
+func (c *Client) Screencap(serial string) (image.Image, error) {
+	// Use shell-based screencap command
+	conn, err := c.Shell(serial, "screencap -p")
 	if err != nil {
-		// Fall back to framebuffer
-		_, _, err = c.Framebuffer(serial, "png")
-		if err != nil {
-			return nil, err
-		}
-		return c.Shell(serial, "screencap -p")
+		return nil, err
 	}
-	return conn, nil
+	defer conn.Close()
+
+	// Read PNG data
+	data, err := io.ReadAll(conn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read screencap data: %w", err)
+	}
+	dumper := hex.Dumper(os.Stdout)
+	dumper.Write(data[:64])
+	dumper.Close()
+
+	// Decode the image
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode screencap image: %w", err)
+	}
+
+	return img, nil
 }
 
 // OpenLogcat starts `logcat` via shell and returns the live connection
@@ -473,4 +492,70 @@ func newScanner(conn net.Conn) *bufio.Scanner {
 // isNoUserError checks if an error is related to the --user option
 func isNoUserError(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "--user")
+}
+
+// decodeFramebuffer decodes raw framebuffer data into an image.Image
+func decodeFramebuffer(data []byte, width, height, bpp int, meta map[string]uint32) (image.Image, error) {
+	// Calculate bytes per pixel
+	bytesPerPixel := bpp / 8
+
+	// Create RGBA image
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	// Get color offsets and lengths
+	redOffset := meta["red_offset"]
+	redLength := meta["red_length"]
+	greenOffset := meta["green_offset"]
+	greenLength := meta["green_length"]
+	blueOffset := meta["blue_offset"]
+	blueLength := meta["blue_length"]
+	alphaOffset := meta["alpha_offset"]
+	alphaLength := meta["alpha_length"]
+
+	// Create masks for color channels
+	redMask := uint32(0xFFFFFFFF>>(32-redLength)) << redOffset
+	greenMask := uint32(0xFFFFFFFF>>(32-greenLength)) << greenOffset
+	blueMask := uint32(0xFFFFFFFF>>(32-blueLength)) << blueOffset
+	alphaMask := uint32(0xFFFFFFFF>>(32-alphaLength)) << alphaOffset
+
+	// Process each pixel
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			offset := (y*width + x) * bytesPerPixel
+			pixel := uint32(0)
+
+			// Read pixel value based on bytes per pixel
+			for i := 0; i < bytesPerPixel; i++ {
+				pixel |= uint32(data[offset+i]) << (i * 8)
+			}
+
+			// Extract color components
+			red := uint8((pixel & redMask) >> redOffset)
+			green := uint8((pixel & greenMask) >> greenOffset)
+			blue := uint8((pixel & blueMask) >> blueOffset)
+			alpha := uint8(0xFF)
+
+			if alphaLength > 0 {
+				alpha = uint8((pixel & alphaMask) >> alphaOffset)
+			}
+
+			// Normalize color values to 8-bit
+			if redLength < 8 {
+				red = red << (8 - redLength)
+			}
+			if greenLength < 8 {
+				green = green << (8 - greenLength)
+			}
+			if blueLength < 8 {
+				blue = blue << (8 - blueLength)
+			}
+			if alphaLength < 8 && alphaLength > 0 {
+				alpha = alpha << (8 - alphaLength)
+			}
+
+			img.SetRGBA(x, y, color.RGBA{R: red, G: green, B: blue, A: alpha})
+		}
+	}
+
+	return img, nil
 }

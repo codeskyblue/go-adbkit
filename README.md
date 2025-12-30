@@ -241,6 +241,27 @@ err := client.ForwardRemove("device-serial", "tcp:8080")
 err := client.ForwardRemoveAll("device-serial")
 ```
 
+#### Screen Capture
+
+```go
+// Get framebuffer as image.Image
+img, err := client.Framebuffer("device-serial")
+if err != nil {
+    log.Fatal(err)
+}
+// img can be used directly with standard image operations
+// For example, save to file:
+// f, _ := os.Create("screenshot.png")
+// defer f.Close()
+// png.Encode(f, img)
+
+// Screencap (returns image.Image)
+img, err = client.Screencap("device-serial")
+if err != nil {
+    log.Fatal(err)
+}
+```
+
 ### DeviceClient
 
 For device-specific operations, use `DeviceClient`:

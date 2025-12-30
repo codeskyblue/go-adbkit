@@ -1,3 +1,3 @@
 module github.com/codeskyblue/go-adbkit
 
-go 1.25.0
+go 1.21
