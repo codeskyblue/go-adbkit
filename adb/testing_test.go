@@ -92,7 +92,6 @@ func (m *mockConn) CheckRequest() error {
 			expectedBytes = append(expectedBytes, m.packets[i].Data...)
 		}
 	}
-
 	// Check if we have written all expected requests
 	if !bytes.Equal(written, expectedBytes) {
 		return fmt.Errorf("request mismatch\n\ngot (hexdump):\n%s\n\nwant (hexdump):\n%s",

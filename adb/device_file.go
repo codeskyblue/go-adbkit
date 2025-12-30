@@ -1,69 +1,61 @@
 package adb
 
 import (
-	"fmt"
 	"io"
-	"strings"
 )
 
-// Stat gets file information from the device
+// Stat gets file information from the device using sync service
 func (d *Device) Stat(path string) (*SyncStatEntry, error) {
-	conn, err := d.Shell(fmt.Sprintf("stat %s", path))
+	syncService, err := d.NewSyncService()
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer syncService.Close()
 
-	data, err := ReadAllFromConn(conn)
-	if err != nil {
-		return nil, err
-	}
-
-	return &SyncStatEntry{
-		ModeStr: string(data),
-	}, nil
+	return syncService.Stat(path)
 }
 
-// Readdir lists files in a directory on the device
+// Readdir lists files in a directory on the device using sync service
 func (d *Device) Readdir(path string) ([]string, error) {
-	conn, err := d.Shell(fmt.Sprintf("ls %s", path))
+	syncService, err := d.NewSyncService()
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer syncService.Close()
 
-	data, err := ReadAllFromConn(conn)
+	entries, err := syncService.Readdir(path)
 	if err != nil {
 		return nil, err
 	}
 
-	lines := strings.Split(string(data), "\n")
-	files := make([]string, 0, len(lines))
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" && !strings.Contains(line, "No such file") {
-			files = append(files, line)
-		}
+	// Convert DirEntry to string list (names only)
+	files := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		files = append(files, entry.Name)
 	}
 	return files, nil
 }
 
-// Pull pulls a file from the device
+// Pull pulls a file from the device using sync service
 func (d *Device) Pull(path string) (io.ReadCloser, error) {
-	conn, err := d.Shell(fmt.Sprintf("cat %s", path))
+	syncService, err := d.NewSyncService()
 	if err != nil {
 		return nil, err
 	}
-	return conn, nil
+
+	return syncService.Pull(path)
 }
 
-// Push pushes a file to the device
-func (d *Device) Push(contents, path string, mode uint32) error {
-	cmd := fmt.Sprintf("echo '%s' > %s", contents, path)
-	conn, err := d.Shell(cmd)
+// Push pushes a file to the device using sync service
+func (d *Device) Push(reader io.Reader, path string, mode uint32) error {
+	syncService, err := d.NewSyncService()
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
-	return nil
+	defer syncService.Close()
+
+	opts := SyncPushOptions{
+		Mode: mode,
+	}
+	return syncService.Push(reader, path, opts)
 }

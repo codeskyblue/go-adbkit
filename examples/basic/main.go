@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"image/png"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -17,6 +18,8 @@ import (
 // $0 kill-server
 // $0 shell <command>
 // $0 screenshot [-s <serial>] [-o <output file>]
+// $0 push <local> <remote> [-s <serial>]
+// $0 pull <remote> <local> [-s <serial>]
 
 func main() {
 	if len(os.Args) < 2 {
@@ -38,6 +41,10 @@ func main() {
 		handleShell(client, os.Args[2:])
 	case "screenshot":
 		handleScreenshot(client, os.Args[2:])
+	case "push":
+		handlePush(client, os.Args[2:])
+	case "pull":
+		handlePull(client, os.Args[2:])
 	case "-h", "--help", "help":
 		printUsage()
 	default:
@@ -51,10 +58,12 @@ func printUsage() {
 	fmt.Println("ADB command-line tool")
 	fmt.Println()
 	fmt.Println("Usage:")
-	fmt.Println("  basic devices                - List connected devices")
-	fmt.Println("  basic kill-server             - Kill ADB server")
-	fmt.Println("  basic shell <command>        - Execute shell command")
-	fmt.Println("  basic screenshot [options]   - Take screenshot")
+	fmt.Println("  basic devices                      - List connected devices")
+	fmt.Println("  basic kill-server                   - Kill ADB server")
+	fmt.Println("  basic shell <command>              - Execute shell command")
+	fmt.Println("  basic screenshot [options]         - Take screenshot")
+	fmt.Println("  basic push <local> <remote> [opts]  - Push file to device")
+	fmt.Println("  basic pull <remote> <local> [opts]  - Pull file from device")
 	fmt.Println()
 	fmt.Println("Shell Command:")
 	fmt.Println("  -s <serial>    Device serial number (auto-detect if only one device)")
@@ -64,6 +73,10 @@ func printUsage() {
 	fmt.Println("  -s <serial>    Device serial number (auto-detect if only one device)")
 	fmt.Println("  -o <output>    Output file path (default: screenshot.png)")
 	fmt.Println()
+	fmt.Println("Push/Pull Options:")
+	fmt.Println("  -s <serial>    Device serial number (auto-detect if only one device)")
+	fmt.Println("  -m <mode>      File permissions (octal, e.g., 0644)")
+	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  basic devices")
 	fmt.Println("  basic kill-server")
@@ -72,6 +85,10 @@ func printUsage() {
 	fmt.Println("  basic screenshot                           # Auto-detect device")
 	fmt.Println("  basic screenshot -s emulator-5554           # Specify device")
 	fmt.Println("  basic screenshot -s emulator-5554 -o screen.png")
+	fmt.Println("  basic push test.txt /sdcard/test.txt")
+	fmt.Println("  basic push test.txt /sdcard/test.txt -s emulator-5554")
+	fmt.Println("  basic pull /sdcard/test.txt ./test.txt")
+	fmt.Println("  basic pull /sdcard/test.txt ./test.txt -s emulator-5554")
 }
 
 func listDevices(client *adb.Client) {
@@ -206,3 +223,101 @@ func handleScreenshot(client *adb.Client, args []string) {
 
 	fmt.Printf("Screenshot saved to: %s\n", *output)
 }
+
+func handlePush(client *adb.Client, args []string) {
+	fs := flag.NewFlagSet("push", flag.ExitOnError)
+	serial := fs.String("s", "", "Device serial number (auto-detect if only one device)")
+	mode := fs.Uint64("m", 0644, "File permissions (octal, default: 0644)")
+
+	if err := fs.Parse(args); err != nil {
+		log.Fatalf("Failed to parse arguments: %v", err)
+	}
+
+	// Get local and remote paths
+	paths := fs.Args()
+	if len(paths) < 2 {
+		fmt.Println("Error: Both local and remote paths are required")
+		fmt.Println()
+		fs.Usage()
+		fmt.Println()
+		fmt.Println("Example: basic push test.txt /sdcard/test.txt")
+		fmt.Println("         basic push test.txt /sdcard/test.txt -s emulator-5554")
+		os.Exit(1)
+	}
+
+	localPath := paths[0]
+	remotePath := paths[1]
+
+	// Auto-detect device if serial not specified
+	autoDetectDevice(client, serial)
+
+	fmt.Printf("Pushing %s to %s on device %s...\n", localPath, remotePath, *serial)
+
+	// Open local file
+	f, err := os.Open(localPath)
+	if err != nil {
+		log.Fatalf("Failed to open local file: %v", err)
+	}
+	defer f.Close()
+
+	// Push file to device
+	device := client.Device(adb.DeviceWithSerial(*serial))
+	if err := device.Push(f, remotePath, uint32(*mode)); err != nil {
+		log.Fatalf("Failed to push file: %v", err)
+	}
+
+	fmt.Println("File pushed successfully")
+}
+
+func handlePull(client *adb.Client, args []string) {
+	fs := flag.NewFlagSet("pull", flag.ExitOnError)
+	serial := fs.String("s", "", "Device serial number (auto-detect if only one device)")
+
+	if err := fs.Parse(args); err != nil {
+		log.Fatalf("Failed to parse arguments: %v", err)
+	}
+
+	// Get remote and local paths
+	paths := fs.Args()
+	if len(paths) < 2 {
+		fmt.Println("Error: Both remote and local paths are required")
+		fmt.Println()
+		fs.Usage()
+		fmt.Println()
+		fmt.Println("Example: basic pull /sdcard/test.txt ./test.txt")
+		fmt.Println("         basic pull /sdcard/test.txt ./test.txt -s emulator-5554")
+		os.Exit(1)
+	}
+
+	remotePath := paths[0]
+	localPath := paths[1]
+
+	// Auto-detect device if serial not specified
+	autoDetectDevice(client, serial)
+
+	fmt.Printf("Pulling %s from device %s to %s...\n", remotePath, *serial, localPath)
+
+	// Pull file from device
+	device := client.Device(adb.DeviceWithSerial(*serial))
+	reader, err := device.Pull(remotePath)
+	if err != nil {
+		log.Fatalf("Failed to pull file: %v", err)
+	}
+	defer reader.Close()
+
+	// Create local file
+	f, err := os.Create(localPath)
+	if err != nil {
+		log.Fatalf("Failed to create local file: %v", err)
+	}
+	defer f.Close()
+
+	// Copy data
+	if _, err := io.Copy(f, reader); err != nil {
+		log.Fatalf("Failed to write file: %v", err)
+	}
+
+	fmt.Println("File pulled successfully")
+}
+
+

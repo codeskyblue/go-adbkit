@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"path"
-	"time"
 )
 
 const (
@@ -158,13 +157,10 @@ type SyncPushOptions struct {
 	Mtime int64
 }
 
-// Push pushes data to a file on the device
-func (s *SyncService) Push(data []byte, filePath string, opts *SyncPushOptions) error {
-	if opts == nil {
-		opts = &SyncPushOptions{
-			Mode:  DEFAULT_CHMOD,
-			Mtime: time.Now().Unix(),
-		}
+// PushContent pushes data to a file on the device
+func (s *SyncService) PushContent(data []byte, filePath string, opts SyncPushOptions) error {
+	if opts.Mode == 0 {
+		opts.Mode = DEFAULT_CHMOD
 	}
 
 	mode := opts.Mode | 0o100000 // Set S_IFREG (regular file)
@@ -176,13 +172,10 @@ func (s *SyncService) Push(data []byte, filePath string, opts *SyncPushOptions) 
 	return s.writeData(data, uint32(opts.Mtime))
 }
 
-// PushStream pushes a stream to a file on the device
-func (s *SyncService) PushStream(reader io.Reader, filePath string, opts *SyncPushOptions) error {
-	if opts == nil {
-		opts = &SyncPushOptions{
-			Mode:  DEFAULT_CHMOD,
-			Mtime: time.Now().Unix(),
-		}
+// Push pushes a stream to a file on the device
+func (s *SyncService) Push(reader io.Reader, filePath string, opts SyncPushOptions) error {
+	if opts.Mode == 0 {
+		opts.Mode = DEFAULT_CHMOD
 	}
 
 	mode := opts.Mode | 0o100000 // Set S_IFREG (regular file)
