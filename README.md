@@ -1,5 +1,7 @@
 # go-adbkit
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/codeskyblue/go-adbkit.svg)](https://pkg.go.dev/github.com/codeskyblue/go-adbkit)
+
 A pure Go client library for the Android Debug Bridge (ADB) protocol.
 
 ## Features

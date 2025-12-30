@@ -35,61 +35,11 @@ func (d *Device) State() (string, error) {
 	return strings.TrimSpace(attr), nil
 }
 
-// Features retrieves device features
-func (d *Device) Features() (map[string]string, error) {
-	transport, err := d.Transport()
-	if err != nil {
-		return nil, err
-	}
-	defer transport.Close()
 
-	cmd := "features:"
-	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
-		return nil, err
-	}
-
-	reply := make([]byte, 4)
-	if _, err := transport.Read(reply); err != nil {
-		return nil, err
-	}
-	if string(reply) == "FAIL" {
-		msg, _ := readLengthPrefixed(transport)
-		return nil, fmt.Errorf("getFeatures failed: %s", string(msg))
-	}
-	if string(reply) != "OKAY" {
-		return nil, fmt.Errorf("unexpected reply: %s", string(reply))
-	}
-
-	payload, err := readLengthPrefixed(transport)
-	if err != nil {
-		return nil, err
-	}
-
-	features := make(map[string]string)
-	lines := strings.Split(strings.TrimSpace(string(payload)), "\n")
-	for _, line := range lines {
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			features[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
-		}
-	}
-	return features, nil
-}
-
-// Properties returns device properties by running `getprop`
-func (d *Device) Properties() (map[string]string, error) {
-	conn, err := d.Shell("getprop")
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-
-	data, err := ReadAllFromConn(conn)
-	if err != nil {
-		return nil, err
-	}
+// parseGetpropOutput parses the output from getprop command into a map
+func parseGetpropOutput(output string) map[string]string {
 	props := make(map[string]string)
-	lines := strings.Split(string(data), "\n")
+	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -109,7 +59,16 @@ func (d *Device) Properties() (map[string]string, error) {
 		}
 		props[key] = rest
 	}
-	return props, nil
+	return props
+}
+
+// Properties returns device properties by running `getprop`
+func (d *Device) Properties() (map[string]string, error) {
+	output, err := d.RunCommand("getprop")
+	if err != nil {
+		return nil, err
+	}
+	return parseGetpropOutput(output), nil
 }
 
 // DHCPIpAddress returns the DHCP IP address for the given interface (defaults to wlan0)

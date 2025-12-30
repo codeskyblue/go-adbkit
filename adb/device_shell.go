@@ -24,7 +24,7 @@ func (d *Device) Shell(command string) (net.Conn, error) {
 		transport.Close()
 		return nil, err
 	}
-	if _, err := checkStatus(transport); err != nil {
+	if _, err := transport.CheckStatus(); err != nil {
 		transport.Close()
 		return nil, err
 	}

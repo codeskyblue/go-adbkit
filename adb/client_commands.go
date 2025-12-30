@@ -243,3 +243,15 @@ func (c *Client) ListForwards() ([]ForwardEntry, error) {
 	return forwards, nil
 }
 
+// Features retrieves the ADB server features (host:features)
+func (c *Client) Features() ([]string, error) {
+	payload, err := c.SendHostCommand("host:features")
+	if err != nil {
+		return nil, err
+	}
+
+	// Features are returned as a comma-separated list
+	features := strings.Split(strings.TrimSpace(string(payload)), ",")
+	return features, nil
+}
+

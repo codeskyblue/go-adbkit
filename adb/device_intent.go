@@ -103,55 +103,45 @@ func (d *Device) StartService(opts StartServiceOptions) (bool, error) {
 
 // buildActivityCommand builds the activity manager command
 func buildActivityCommand(opts StartActivityOptions, baseCmd string) string {
-	var buf strings.Builder
-	buf.WriteString(baseCmd)
+	args := []string{baseCmd}
 
 	if opts.Action != "" {
-		buf.WriteString(" -a ")
-		buf.WriteString(opts.Action)
+		args = append(args, "-a", opts.Action)
 	}
 
 	if opts.Data != "" {
-		buf.WriteString(" -d ")
-		buf.WriteString(opts.Data)
+		args = append(args, "-d", opts.Data)
 	}
 
 	if opts.Type != "" {
-		buf.WriteString(" -t ")
-		buf.WriteString(opts.Type)
+		args = append(args, "-t", opts.Type)
 	}
 
 	for _, cat := range opts.Category {
-		buf.WriteString(" -c ")
-		buf.WriteString(cat)
+		args = append(args, "-c", cat)
 	}
 
 	if opts.Component != "" {
-		buf.WriteString(" -n ")
-		buf.WriteString(opts.Component)
+		args = append(args, "-n", opts.Component)
 	}
 
 	for _, flag := range opts.Flags {
-		buf.WriteString(" -f ")
-		buf.WriteString(flag)
+		args = append(args, "-f", flag)
 	}
 
 	for key, val := range opts.Extras {
-		buf.WriteString(" --es ")
-		buf.WriteString(key)
-		buf.WriteString(" ")
-		buf.WriteString(val)
+		args = append(args, "--es", key, val)
 	}
 
 	if opts.Wait {
-		buf.WriteString(" -W")
+		args = append(args, "-W")
 	}
 
 	if opts.WaitForDebug {
-		buf.WriteString(" -D")
+		args = append(args, "-D")
 	}
 
-	return fmt.Sprintf("shell:%s", buf.String())
+	return fmt.Sprintf("shell:%s", strings.Join(args, " "))
 }
 
 // buildServiceCommand builds the service start command

@@ -28,34 +28,6 @@ func (d *Device) Transport() (*Transport, error) {
 	return NewTransport(conn), nil
 }
 
-// readStatus reads a 4-byte status code from the connection
-func readStatus(r io.Reader) (string, error) {
-	status := make([]byte, 4)
-	if _, err := io.ReadFull(r, status); err != nil {
-		return "", err
-	}
-	return string(status), nil
-}
-
-// checkStatus reads a 4-byte status and returns an error if it's a failure
-// Returns the status string, and for failure status, also reads and returns the error message
-func checkStatus(r io.Reader) (string, error) {
-	status, err := readStatus(r)
-	if err != nil {
-		return "", err
-	}
-
-	if status == StatusFailure {
-		msg, err := readLengthPrefixed(r)
-		if err != nil {
-			return StatusFailure, fmt.Errorf("operation failed (unable to read error message)")
-		}
-		return StatusFailure, fmt.Errorf("operation failed: %s", string(msg))
-	}
-
-	return status, nil
-}
-
 // Transport wraps a net.Conn and provides ADB protocol-specific methods
 type Transport struct {
 	net.Conn
@@ -74,13 +46,25 @@ func (t *Transport) Read(p []byte) (n int, err error) {
 // CheckStatus reads a 4-byte status and returns an error if it's a failure
 // Returns the status string, and for failure status, also reads and returns the error message
 func (t *Transport) CheckStatus() (string, error) {
-	return checkStatus(t)
+	statusBuf := make([]byte, 4)
+	if _, err := io.ReadFull(t, statusBuf); err != nil {
+		return "", err
+	}
+	status := string(statusBuf)
+	if status == StatusFailure {
+		msg, err := readLengthPrefixed(t)
+		if err != nil {
+			return StatusFailure, fmt.Errorf("operation failed (unable to read error message)")
+		}
+		return StatusFailure, fmt.Errorf("operation failed: %s", string(msg))
+	}
+	return status, nil
 }
 
 // CheckStatusSuccess reads a 4-byte status and ensures it's StatusSuccess
 // Returns an error if the status is not StatusSuccess
 func (t *Transport) CheckStatusSuccess() error {
-	status, err := checkStatus(t)
+	status, err := t.CheckStatus()
 	if err != nil {
 		return err
 	}
