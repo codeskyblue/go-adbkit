@@ -1,6 +1,7 @@
 package adb
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -8,7 +9,12 @@ import (
 
 // Transport switches the connection to communicate directly with the device
 func (d *Device) Transport() (*Transport, error) {
-	conn, err := d.client.Connection()
+	return d.TransportContext(context.Background())
+}
+
+// TransportContext switches the connection to communicate directly with the device, with context support
+func (d *Device) TransportContext(ctx context.Context) (*Transport, error) {
+	conn, err := d.client.ConnectionContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -19,7 +25,7 @@ func (d *Device) Transport() (*Transport, error) {
 		conn.Close()
 		return nil, err
 	}
-	if status != StatusSuccess {
+	if status != StatusOkay {
 		payload, _ := readLengthPrefixed(conn)
 		conn.Close()
 		return nil, fmt.Errorf("device selection failed: %s", string(payload))
@@ -51,12 +57,12 @@ func (t *Transport) CheckStatus() (string, error) {
 		return "", err
 	}
 	status := string(statusBuf)
-	if status == StatusFailure {
+	if status == StatusFail {
 		msg, err := readLengthPrefixed(t)
 		if err != nil {
-			return StatusFailure, fmt.Errorf("operation failed (unable to read error message)")
+			return StatusFail, fmt.Errorf("operation failed (unable to read error message)")
 		}
-		return StatusFailure, fmt.Errorf("operation failed: %s", string(msg))
+		return StatusFail, fmt.Errorf("operation failed: %s", string(msg))
 	}
 	return status, nil
 }
@@ -68,8 +74,8 @@ func (t *Transport) CheckStatusSuccess() error {
 	if err != nil {
 		return err
 	}
-	if status != StatusSuccess {
-		return fmt.Errorf("unexpected status: %s (expected %s)", status, StatusSuccess)
+	if status != StatusOkay {
+		return fmt.Errorf("unexpected status: %s (expected %s)", status, StatusOkay)
 	}
 	return nil
 }

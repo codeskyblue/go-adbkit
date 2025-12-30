@@ -1,6 +1,7 @@
 package adb
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -9,7 +10,12 @@ import (
 
 // Connection creates a new connection to the adb server
 func (c *Client) Connection() (net.Conn, error) {
-	return c.connector.Connection()
+	return c.ConnectionContext(context.Background())
+}
+
+// ConnectionContext creates a new connection to the adb server with context support
+func (c *Client) ConnectionContext(ctx context.Context) (net.Conn, error) {
+	return c.connector.ConnectionContext(ctx)
 }
 
 // sendADBCommand writes a length-prefixed command and reads the 4-byte status (OKAY/FAIL)

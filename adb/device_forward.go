@@ -25,13 +25,13 @@ func (d *Device) Forward(local, remote string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if status == StatusSuccess {
+	if status == StatusOkay {
 		// read second reply
 		status, err := transport.CheckStatus()
 		if err != nil {
 			return false, err
 		}
-		if status == StatusSuccess {
+		if status == StatusOkay {
 			return true, nil
 		}
 		return false, fmt.Errorf("unexpected status: %s", status)
@@ -56,12 +56,12 @@ func (d *Device) Reverse(remote, local string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if status == StatusSuccess {
+	if status == StatusOkay {
 		status, err := transport.CheckStatus()
 		if err != nil {
 			return false, err
 		}
-		if status == StatusSuccess {
+		if status == StatusOkay {
 			return true, nil
 		}
 		return false, fmt.Errorf("unexpected status: %s", status)
@@ -87,7 +87,7 @@ func (d *Device) ListReverses() ([]ReverseEntry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("listReverses failed: %w", err)
 	}
-	if status != StatusSuccess {
+	if status != StatusOkay {
 		return nil, fmt.Errorf("unexpected status: %s", status)
 	}
 

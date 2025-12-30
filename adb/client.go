@@ -1,6 +1,7 @@
 package adb
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -11,7 +12,7 @@ import (
 
 // Connector is an interface that abstracts connection creation for testability
 type Connector interface {
-	Connection() (net.Conn, error)
+	ConnectionContext(ctx context.Context) (net.Conn, error)
 }
 
 // connectorImpl implements Connector with a specific address
@@ -20,8 +21,9 @@ type connectorImpl struct {
 	port int
 }
 
-func (c connectorImpl) Connection() (net.Conn, error) {
-	return net.Dial("tcp", c.addr())
+func (c connectorImpl) ConnectionContext(ctx context.Context) (net.Conn, error) {
+	var d net.Dialer
+	return d.DialContext(ctx, "tcp", c.addr())
 }
 
 func (c connectorImpl) addr() string {
@@ -34,14 +36,14 @@ type autoStartConnector struct {
 	bin  string
 }
 
-func (c *autoStartConnector) Connection() (net.Conn, error) {
+func (c *autoStartConnector) ConnectionContext(ctx context.Context) (net.Conn, error) {
 	// Try to connect first
-	conn, err := c.base.Connection()
+	conn, err := c.base.ConnectionContext(ctx)
 	if err != nil {
 		// Connection failed, try to start the server
 		_ = exec.Command(c.bin, "start-server").Run()
 		// Try again
-		conn, err = c.base.Connection()
+		conn, err = c.base.ConnectionContext(ctx)
 	}
 	return conn, err
 }

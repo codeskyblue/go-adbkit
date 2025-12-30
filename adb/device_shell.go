@@ -10,7 +10,12 @@ import (
 
 // Shell opens a shell stream on the device
 func (d *Device) Shell(command string) (net.Conn, error) {
-	transport, err := d.Transport()
+	return d.ShellContext(context.Background(), command)
+}
+
+// ShellContext opens a shell stream with context support
+func (d *Device) ShellContext(ctx context.Context, command string) (net.Conn, error) {
+	transport, err := d.TransportContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +43,7 @@ func (d *Device) RunCommand(command string) (string, error) {
 
 // RunCommandContext runs a shell command with context support
 func (d *Device) RunCommandContext(ctx context.Context, command string) (string, error) {
-	conn, err := d.Shell(command)
+	conn, err := d.ShellContext(ctx, command)
 	if err != nil {
 		return "", err
 	}

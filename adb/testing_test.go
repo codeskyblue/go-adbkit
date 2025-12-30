@@ -3,6 +3,7 @@ package adb
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
 	"net"
@@ -145,7 +146,7 @@ type mockConnector struct {
 	conn *mockConn
 }
 
-func (m *mockConnector) Connection() (net.Conn, error) {
+func (m *mockConnector) ConnectionContext(ctx context.Context) (net.Conn, error) {
 	return m.conn, nil
 }
 
