@@ -2,6 +2,7 @@ package adb
 
 import (
 	"bufio"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -159,6 +160,28 @@ func (c *Client) Shell(serial string, command string) (net.Conn, error) {
 
 	// The transport is now a live stream for shell output
 	return transport, nil
+}
+
+// RunCommand runs a shell command on the device and returns the output as a string
+func (c *Client) RunCommand(serial string, command string) (string, error) {
+	return c.RunCommandContext(context.Background(), serial, command)
+}
+
+// RunCommandContext runs a shell command on the device with context support and returns the output as a string
+func (c *Client) RunCommandContext(ctx context.Context, serial string, command string) (string, error) {
+	conn, err := c.Shell(serial, command)
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	// Read output with context support
+	data, err := readAllWithContext(ctx, conn)
+	if err != nil {
+		return "", err
+	}
+
+	return string(data), nil
 }
 
 // Reboot reboots the device
@@ -417,6 +440,29 @@ func (c *Client) OpenLogcat(serial string, options string) (net.Conn, error) {
 func ReadAllFromConn(conn net.Conn) ([]byte, error) {
 	defer conn.Close()
 	return io.ReadAll(bufio.NewReader(conn))
+}
+
+// readAllWithContext reads all data from a connection with context support
+func readAllWithContext(ctx context.Context, conn net.Conn) ([]byte, error) {
+	type result struct {
+		data []byte
+		err  error
+	}
+
+	resultChan := make(chan result, 1)
+
+	go func() {
+		data, err := io.ReadAll(bufio.NewReader(conn))
+		resultChan <- result{data, err}
+	}()
+
+	select {
+	case <-ctx.Done():
+		conn.Close()
+		return nil, ctx.Err()
+	case res := <-resultChan:
+		return res.data, res.err
+	}
 }
 
 // newScanner creates a buffered scanner for reading from a connection

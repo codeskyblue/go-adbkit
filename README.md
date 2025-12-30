@@ -56,11 +56,28 @@ func main() {
 ### Running Shell Commands
 
 ```go
-// Get a device shell client
+// Method 1: Using DeviceClient
 deviceClient := client.DeviceClient("device-serial")
 
 // Run a shell command
 output, err := deviceClient.RunCommand("getprop ro.product.model")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Device model: %s\n", output)
+
+// Method 2: Using Client.RunCommand (simpler, no context)
+output, err = client.RunCommand("device-serial", "getprop ro.product.model")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Device model: %s\n", output)
+
+// Method 3: Using RunCommandContext with timeout support
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+
+output, err = client.RunCommandContext(ctx, "device-serial", "getprop ro.product.model")
 if err != nil {
     log.Fatal(err)
 }
@@ -194,6 +211,18 @@ state, err := client.GetState("device-serial")
 // Get device features
 features, err := client.GetFeatures("device-serial")
 // Returns: map[string]string
+
+// Run shell command (simple version without context)
+output, err := client.RunCommand("device-serial", "ls /sdcard")
+
+// Run shell command with context support
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
+output, err = client.RunCommandContext(ctx, "device-serial", "ls /sdcard")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Output: %s\n", output)
 ```
 
 #### Port Forwarding
