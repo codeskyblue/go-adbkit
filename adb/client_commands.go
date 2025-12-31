@@ -181,8 +181,8 @@ func parseDevicesList(line string) []DeviceInfo {
 	return devices
 }
 
-// Kill kills the adb server
-func (c *Client) Kill() (bool, error) {
+// KillServer kills the adb server
+func (c *Client) KillServer() (bool, error) {
 	payload, err := c.SendHostCommand("host:kill")
 	if err != nil {
 		return false, err
@@ -254,4 +254,3 @@ func (c *Client) Features() ([]string, error) {
 	features := strings.Split(strings.TrimSpace(string(payload)), ",")
 	return features, nil
 }
-

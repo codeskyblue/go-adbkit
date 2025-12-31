@@ -168,7 +168,7 @@ func TestDeviceFeatures(t *testing.T) {
 	}
 }
 
-func TestKill(t *testing.T) {
+func TestKillServer(t *testing.T) {
 	// testdata for kill command
 	testdata := `
 > 2025/12/30 22:12:46.000207484  length=13 from=0 to=12
@@ -180,9 +180,9 @@ func TestKill(t *testing.T) {
 
 	client := NewTestClient(testdata)
 
-	killed, err := client.Kill()
+	killed, err := client.KillServer()
 	if err != nil {
-		t.Fatalf("Kill() error = %v", err)
+		t.Fatalf("KillServer() error = %v", err)
 	}
 	if err := client.Conn.CheckRequest(); err != nil {
 		t.Fatalf("CheckRequest error = %v", err)
@@ -190,7 +190,6 @@ func TestKill(t *testing.T) {
 
 	// Kill returns true if the response has empty payload
 	if !killed {
-		t.Errorf("Kill() = %v, want true", killed)
+		t.Errorf("KillServer() = %v, want true", killed)
 	}
 }
-

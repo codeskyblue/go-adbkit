@@ -32,7 +32,7 @@ The codebase has been organized into modular files for better maintainability:
   - `Connect()` / `Disconnect()` - TCP/IP device connections
   - `ListDevices()` / `ListDevicesWithPaths()` - List attached devices
   - `TrackDevices()` / `TrackDevicesWithCallback()` - Monitor device changes
-  - `Kill()` - Kill ADB server
+  - `KillServer()` - Kill ADB server
   - `ConnectWithHostPort()` / `DisconnectWithHostPort()` - Helper for host:port format
 
 - **device_commands.go** - Device-specific commands
@@ -53,9 +53,9 @@ The codebase has been organized into modular files for better maintainability:
   - `Screencap()` / `ScreencapWithFallback()` - Screen capture
   - `OpenLogcat()` - Open logcat stream
 
-- **package_commands.go** - Application management
+- **device_package.go** - Application management
   - `GetPackages()` - List installed packages
-  - `Clear()` - Clear app data
+  - `ClearPackageData()` - Clear app data
   - `Install()` / `InstallRemote()` - Install APK
   - `Uninstall()` - Uninstall package
   - `IsInstalled()` - Check if package is installed

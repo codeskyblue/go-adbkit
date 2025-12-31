@@ -109,7 +109,7 @@ func listDevices(client *adb.Client) {
 }
 
 func killServer(client *adb.Client) {
-	ok, err := client.Kill()
+	ok, err := client.KillServer()
 	if err != nil {
 		log.Fatalf("Failed to kill server: %v", err)
 	}
@@ -319,5 +319,3 @@ func handlePull(client *adb.Client, args []string) {
 
 	fmt.Println("File pulled successfully")
 }
-
-

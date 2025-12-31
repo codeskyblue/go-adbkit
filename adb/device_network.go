@@ -79,21 +79,12 @@ func (d *Device) OpenLocal(path string) (net.Conn, error) {
 		return nil, err
 	}
 
-	reply := make([]byte, 4)
-	if _, err := transport.Read(reply); err != nil {
+	if err := transport.CheckStatusSuccess(); err != nil {
 		transport.Close()
-		return nil, err
+		return nil, fmt.Errorf("openLocal failed: %w", err)
 	}
-	if string(reply) == "OKAY" {
-		return transport, nil
-	}
-	if string(reply) == "FAIL" {
-		msg, _ := readLengthPrefixed(transport)
-		transport.Close()
-		return nil, fmt.Errorf("openLocal failed: %s", string(msg))
-	}
-	transport.Close()
-	return nil, fmt.Errorf("unexpected reply: %s", string(reply))
+
+	return transport, nil
 }
 
 // OpenLog opens a log buffer on the device
@@ -109,21 +100,12 @@ func (d *Device) OpenLog(name string) (net.Conn, error) {
 		return nil, err
 	}
 
-	reply := make([]byte, 4)
-	if _, err := transport.Read(reply); err != nil {
+	if err := transport.CheckStatusSuccess(); err != nil {
 		transport.Close()
-		return nil, err
+		return nil, fmt.Errorf("openLog failed: %w", err)
 	}
-	if string(reply) == "OKAY" {
-		return transport, nil
-	}
-	if string(reply) == "FAIL" {
-		msg, _ := readLengthPrefixed(transport)
-		transport.Close()
-		return nil, fmt.Errorf("openLog failed: %s", string(msg))
-	}
-	transport.Close()
-	return nil, fmt.Errorf("unexpected reply: %s", string(reply))
+
+	return transport, nil
 }
 
 // OpenSocket opens a socket connection to a specific address on the device
@@ -151,19 +133,10 @@ func (d *Device) OpenSocketContext(ctx context.Context, addr string) (net.Conn, 
 		return nil, err
 	}
 
-	reply := make([]byte, 4)
-	if _, err := transport.Read(reply); err != nil {
+	if err := transport.CheckStatusSuccess(); err != nil {
 		transport.Close()
-		return nil, err
+		return nil, fmt.Errorf("openSocket failed: %w", err)
 	}
-	if string(reply) ==  StatusOkay {
-		return transport, nil
-	}
-	if string(reply) == StatusFail {
-		msg, _ := readLengthPrefixed(transport)
-		transport.Close()
-		return nil, fmt.Errorf("openSocket failed: %s", string(msg))
-	}
-	transport.Close()
-	return nil, fmt.Errorf("unexpected reply: %s", string(reply))
+
+	return transport, nil
 }

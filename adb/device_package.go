@@ -31,8 +31,8 @@ func (d *Device) GetPackages() ([]string, error) {
 	return packages, nil
 }
 
-// Clear clears the data of an application
-func (d *Device) Clear(pkg string) (bool, error) {
+// ClearPackageData clears the data of an application package
+func (d *Device) ClearPackageData(pkg string) (bool, error) {
 	transport, err := d.Transport()
 	if err != nil {
 		return false, err
@@ -44,18 +44,11 @@ func (d *Device) Clear(pkg string) (bool, error) {
 		return false, err
 	}
 
-	reply := make([]byte, 4)
-	if _, err := transport.Read(reply); err != nil {
-		return false, err
+	if err := transport.CheckStatusSuccess(); err != nil {
+		return false, fmt.Errorf("clear failed: %w", err)
 	}
-	if string(reply) == "OKAY" {
-		return true, nil
-	}
-	if string(reply) == "FAIL" {
-		msg, _ := readLengthPrefixed(transport)
-		return false, fmt.Errorf("clear failed: %s", string(msg))
-	}
-	return false, fmt.Errorf("unexpected reply: %s", string(reply))
+
+	return true, nil
 }
 
 // Install installs an APK file to the device
@@ -157,17 +150,14 @@ func (d *Device) IsInstalled(pkg string) (bool, error) {
 		return false, err
 	}
 
-	reply := make([]byte, 4)
-	if _, err := transport.Read(reply); err != nil {
-		return false, err
+	status, err := transport.CheckStatus()
+	if err != nil {
+		return false, fmt.Errorf("isInstalled failed: %w", err)
 	}
-	if string(reply) == "OKAY" {
-		data, _ := io.ReadAll(transport)
-		return strings.Contains(string(data), "package:"), nil
+	if status != StatusOkay {
+		return false, fmt.Errorf("unexpected status: %s", status)
 	}
-	if string(reply) == "FAIL" {
-		msg, _ := readLengthPrefixed(transport)
-		return false, fmt.Errorf("isInstalled failed: %s", string(msg))
-	}
-	return false, fmt.Errorf("unexpected reply: %s", string(reply))
+
+	data, _ := io.ReadAll(transport)
+	return strings.Contains(string(data), "package:"), nil
 }
