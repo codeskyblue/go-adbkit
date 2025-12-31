@@ -210,12 +210,13 @@ func (s *Socket) handleAuthPacket(packet *Packet) error {
 			s.signature = packet.Data
 			slog.Debug("Received signature", "signature", base64.StdEncoding.EncodeToString(packet.Data))
 		}
-		token := s.token
 		s.mu.Unlock()
-
-		slog.Debug("O:A_AUTH")
-		authPacket := Assemble(A_AUTH, AUTH_TOKEN, 0, token)
-		return s.Write(authPacket)
+		return s.sendCNXN()
+		
+		// slog.Debug("O:A_AUTH")
+		// token := s.token
+		// authPacket := Assemble(A_AUTH, AUTH_TOKEN, 0, token)
+		// return s.Write(authPacket)
 
 	case AUTH_RSAPUBLICKEY:
 		s.mu.Lock()
@@ -227,7 +228,7 @@ func (s *Socket) handleAuthPacket(packet *Packet) error {
 			return ErrAuthFailed
 		}
 
-		if packet.Data == nil || len(packet.Data) < 2 {
+		if len(packet.Data) < 2 {
 			return ErrAuthFailed
 		}
 
@@ -241,20 +242,24 @@ func (s *Socket) handleAuthPacket(packet *Packet) error {
 			return ErrAuthFailed
 		}
 
-		s.mu.Lock()
-		s.authorized = true
-		deviceID := s.getDeviceID()
-		version := s.version
-		maxPayload := s.maxPayload
-		s.mu.Unlock()
-
-		slog.Debug("O:A_CNXN")
-		cnxnPacket := Assemble(A_CNXN, Swap32(version), maxPayload, deviceID)
-		return s.Write(cnxnPacket)
-
+		return s.sendCNXN()
 	default:
 		return fmt.Errorf("unknown authentication method: %d", packet.Arg0)
 	}
+}
+
+// CNXN means "connection"
+// When the client is authorized, send a CNXN packet
+func (s *Socket) sendCNXN() error {
+	s.mu.Lock()
+	version := s.version
+	maxPayload := s.maxPayload
+	deviceID := s.getDeviceID()
+	s.mu.Unlock()
+
+	slog.Debug("O:A_CNXN")
+	cnxnPacket := Assemble(A_CNXN, Swap32(version), maxPayload, deviceID)
+	return s.Write(cnxnPacket)
 }
 
 func (s *Socket) handleOpenPacket(packet *Packet) error {
