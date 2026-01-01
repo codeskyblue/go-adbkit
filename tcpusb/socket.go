@@ -211,12 +211,12 @@ func (s *Socket) handleAuthPacket(packet *Packet) error {
 			slog.Debug("Received signature", "signature", base64.StdEncoding.EncodeToString(packet.Data))
 		}
 		s.mu.Unlock()
-		return s.sendCNXN()
-		
-		// slog.Debug("O:A_AUTH")
-		// token := s.token
-		// authPacket := Assemble(A_AUTH, AUTH_TOKEN, 0, token)
-		// return s.Write(authPacket)
+		// return s.sendCNXN()
+
+		slog.Debug("O:A_AUTH")
+		token := s.token
+		authPacket := Assemble(A_AUTH, AUTH_TOKEN, 0, token)
+		return s.Write(authPacket)
 
 	case AUTH_RSAPUBLICKEY:
 		s.mu.Lock()
@@ -241,7 +241,7 @@ func (s *Socket) handleAuthPacket(packet *Packet) error {
 		if err := s.authHandler(packet.Data); err != nil {
 			return ErrAuthFailed
 		}
-
+		s.authorized = true
 		return s.sendCNXN()
 	default:
 		return fmt.Errorf("unknown authentication method: %d", packet.Arg0)
