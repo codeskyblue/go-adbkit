@@ -79,3 +79,76 @@ func (t *Transport) CheckStatusSuccess() error {
 	}
 	return nil
 }
+
+// SendCommand sends a length-prefixed command and reads the status
+// Returns the status string and error if failed
+func (t *Transport) SendCommand(cmd string) (string, error) {
+	if _, err := t.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
+		return "", err
+	}
+	return t.CheckStatus()
+}
+
+// ExecuteSimpleCommand executes a command that expects OKAY/FAIL response
+// Commonly used for commands that don't return data
+func (t *Transport) ExecuteSimpleCommand(cmd string) error {
+	status, err := t.SendCommand(cmd)
+	if err != nil {
+		return err
+	}
+	if status == StatusFail {
+		return fmt.Errorf("command '%s' failed", cmd)
+	}
+	return nil
+}
+
+// ExecuteCommandWithResponse executes a command and returns the response data
+// Returns data if status is OKAY, error otherwise
+func (t *Transport) ExecuteCommandWithResponse(cmd string) ([]byte, error) {
+	status, err := t.SendCommand(cmd)
+	if err != nil {
+		return nil, err
+	}
+	if status == StatusFail {
+		return nil, fmt.Errorf("command '%s' failed", cmd)
+	}
+	return io.ReadAll(t)
+}
+
+// ExecuteTransportCommand executes a simple command with automatic transport lifecycle management
+func (d *Device) ExecuteTransportCommand(cmd string) error {
+	transport, err := d.Transport()
+	if err != nil {
+		return err
+	}
+	defer transport.Close()
+
+	return transport.ExecuteSimpleCommand(cmd)
+}
+
+// ExecuteTransportCommandWithResponse executes a command and returns response
+func (d *Device) ExecuteTransportCommandWithResponse(cmd string) ([]byte, error) {
+	transport, err := d.Transport()
+	if err != nil {
+		return nil, err
+	}
+	defer transport.Close()
+
+	return transport.ExecuteCommandWithResponse(cmd)
+}
+
+// OpenTransportConnection opens a transport connection for long-running operations
+// The caller is responsible for closing the connection
+func (d *Device) OpenTransportConnection(cmd string) (*Transport, error) {
+	transport, err := d.Transport()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := transport.ExecuteSimpleCommand(cmd); err != nil {
+		transport.Close()
+		return nil, err
+	}
+
+	return transport, nil
+}

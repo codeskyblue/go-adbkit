@@ -20,23 +20,12 @@ func (d *Device) Framebuffer() (image.Image, error) {
 	}
 	defer transport.Close()
 
-	cmd := "framebuffer:"
-	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
+	status, err := transport.SendCommand("framebuffer:")
+	if err != nil {
 		return nil, err
 	}
-
-	reply := make([]byte, 4)
-	if _, err := transport.Read(reply); err != nil {
-		return nil, err
-	}
-
-	if string(reply) == "FAIL" {
-		msg, _ := readLengthPrefixed(transport)
-		return nil, fmt.Errorf("framebuffer failed: %s", string(msg))
-	}
-
-	if string(reply) != "OKAY" {
-		return nil, fmt.Errorf("unexpected reply: %s", string(reply))
+	if status != StatusOkay {
+		return nil, fmt.Errorf("unexpected status: %s", status)
 	}
 
 	header := make([]byte, 52)

@@ -19,20 +19,18 @@ func (d *Device) ShellContext(ctx context.Context, command string) (net.Conn, er
 	if err != nil {
 		return nil, err
 	}
-	svc := []byte("shell:" + command)
-	length := fmt.Sprintf("%04x", len(svc))
-	if _, err := transport.Write([]byte(length)); err != nil {
+
+	cmd := "shell:" + command
+	status, err := transport.SendCommand(cmd)
+	if err != nil {
 		transport.Close()
 		return nil, err
 	}
-	if _, err := transport.Write(svc); err != nil {
+	if status != StatusOkay {
 		transport.Close()
-		return nil, err
+		return nil, fmt.Errorf("unexpected status: %s", status)
 	}
-	if _, err := transport.CheckStatus(); err != nil {
-		transport.Close()
-		return nil, err
-	}
+
 	return transport, nil
 }
 
