@@ -39,6 +39,37 @@ func (d *Device) Forward(local, remote string) (bool, error) {
 	return false, fmt.Errorf("unexpected status: %s", status)
 }
 
+// ForwardRemove removes a port forward on the server for this device.
+func (d *Device) ForwardRemove(local string) (bool, error) {
+	conn, err := d.client.Connection()
+	if err != nil {
+		return false, err
+	}
+	defer conn.Close()
+
+	cmd := fmt.Sprintf("%s:killforward:%s", d.descriptor.getHostPrefix(), local)
+	if _, err := conn.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
+		return false, err
+	}
+
+	transport := NewTransport(conn)
+	status, err := transport.CheckStatus()
+	if err != nil {
+		return false, err
+	}
+	if status == StatusOkay {
+		status, err := transport.CheckStatus()
+		if err != nil {
+			return false, err
+		}
+		if status == StatusOkay {
+			return true, nil
+		}
+		return false, fmt.Errorf("unexpected status: %s", status)
+	}
+	return false, fmt.Errorf("unexpected status: %s", status)
+}
+
 // Reverse requests a reverse-forward on the device transport (reverse:forward:remote;local)
 func (d *Device) Reverse(remote, local string) (bool, error) {
 	transport, err := d.Transport()
@@ -48,6 +79,36 @@ func (d *Device) Reverse(remote, local string) (bool, error) {
 	defer transport.Close()
 
 	cmd := fmt.Sprintf("reverse:forward:%s;%s", remote, local)
+	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
+		return false, err
+	}
+
+	status, err := transport.CheckStatus()
+	if err != nil {
+		return false, err
+	}
+	if status == StatusOkay {
+		status, err := transport.CheckStatus()
+		if err != nil {
+			return false, err
+		}
+		if status == StatusOkay {
+			return true, nil
+		}
+		return false, fmt.Errorf("unexpected status: %s", status)
+	}
+	return false, fmt.Errorf("unexpected status: %s", status)
+}
+
+// ReverseRemove removes a reverse-forward on the device transport (reverse:killforward:remote)
+func (d *Device) ReverseRemove(remote string) (bool, error) {
+	transport, err := d.Transport()
+	if err != nil {
+		return false, err
+	}
+	defer transport.Close()
+
+	cmd := fmt.Sprintf("reverse:killforward:%s", remote)
 	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
 		return false, err
 	}

@@ -46,7 +46,10 @@ func (d *Device) Framebuffer() (image.Image, error) {
 
 	meta := make(map[string]uint32)
 	offset := 0
-	fields := []string{"version", "bpp", "size", "width", "height", "red_offset", "red_length", "blue_offset", "blue_length", "green_offset", "green_length", "alpha_offset", "alpha_length"}
+	// The ADB framebuffer header format:
+	// version, bpp, reserved, size, height, width, red_offset, red_length, blue_offset, blue_length, green_offset, green_length, alpha_offset
+	// Note: alpha_length is not included in the 52-byte header
+	fields := []string{"version", "bpp", "reserved", "size", "height", "width", "red_offset", "red_length", "blue_offset", "blue_length", "green_offset", "green_length", "alpha_offset"}
 	for i := 0; i < len(fields); i++ {
 		meta[fields[i]] = binary.LittleEndian.Uint32(header[offset : offset+4])
 		offset += 4
@@ -55,6 +58,9 @@ func (d *Device) Framebuffer() (image.Image, error) {
 	width := int(meta["width"])
 	height := int(meta["height"])
 	bpp := int(meta["bpp"])
+
+	// Note: alpha_length is not included in the header, default to 0
+	meta["alpha_length"] = 0
 
 	pixelData := make([]byte, meta["size"])
 	if _, err := io.ReadFull(transport, pixelData); err != nil {
