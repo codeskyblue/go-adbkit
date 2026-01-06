@@ -3,6 +3,7 @@ package adb
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 )
 
@@ -31,8 +32,8 @@ func (d *Device) GetPackages() ([]string, error) {
 	return packages, nil
 }
 
-// Clear clears the data of an application
-func (d *Device) Clear(pkg string) (bool, error) {
+// ClearPackageData clears the data of an application package
+func (d *Device) ClearPackageData(pkg string) (bool, error) {
 	transport, err := d.Transport()
 	if err != nil {
 		return false, err
@@ -53,37 +54,126 @@ func (d *Device) Clear(pkg string) (bool, error) {
 	}
 	if string(reply) == "FAIL" {
 		msg, _ := readLengthPrefixed(transport)
-		return false, fmt.Errorf("clear failed: %s", string(msg))
+		return false, fmt.Errorf("clear package data failed: %s", string(msg))
 	}
 	return false, fmt.Errorf("unexpected reply: %s", string(reply))
 }
 
 // Install installs an APK file to the device
 func (d *Device) Install(apkPath string) (bool, error) {
+	// Check if abb_exec feature is available
+	hasAbbExec, err := d.hasAbbExecFeature()
+	if err != nil {
+		// If we can't check features, try traditional method
+		return d.installUsingPush(apkPath)
+	}
+
+	if hasAbbExec {
+		// Use modern abb_exec method (faster, no intermediate file)
+		return d.installUsingAbbExec(apkPath)
+	}
+
+	// Fall back to traditional push + install method
+	return d.installUsingPush(apkPath)
+}
+
+// hasAbbExecFeature checks if the device supports abb_exec feature
+func (d *Device) hasAbbExecFeature() (bool, error) {
+	features, err := d.client.Features()
+	if err != nil {
+		return false, err
+	}
+	for _, f := range features {
+		if f == "abb_exec" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// installUsingAbbExec installs APK using the abb_exec feature (streaming install)
+func (d *Device) installUsingAbbExec(apkPath string) (bool, error) {
+	// Open the local APK file
+	file, err := os.Open(apkPath)
+	if err != nil {
+		return false, err
+	}
+	defer file.Close()
+
+	// Get file size
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return false, err
+	}
+
+	// Build abb_exec command
+	// Format: abb_exec:package install -S <size>
+	cmd := fmt.Sprintf("abb_exec:package install -S %d", fileInfo.Size())
+
+	// Create transport and send command
 	transport, err := d.Transport()
 	if err != nil {
 		return false, err
 	}
 	defer transport.Close()
 
-	cmd := fmt.Sprintf("shell:pm install -r %s", apkPath)
 	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
 		return false, err
 	}
 
+	// Check if command was accepted
 	reply := make([]byte, 4)
 	if _, err := transport.Read(reply); err != nil {
 		return false, err
 	}
-	if string(reply) == "OKAY" {
-		data, _ := io.ReadAll(transport)
-		return strings.Contains(string(data), "Success"), nil
-	}
-	if string(reply) == "FAIL" {
+
+	if string(reply) != "OKAY" {
 		msg, _ := readLengthPrefixed(transport)
-		return false, fmt.Errorf("install failed: %s", string(msg))
+		return false, fmt.Errorf("abb_exec command failed: %s", string(msg))
 	}
-	return false, fmt.Errorf("unexpected reply: %s", string(reply))
+
+	// Stream the APK content
+	_, err = io.Copy(transport, file)
+	if err != nil {
+		return false, err
+	}
+
+	// Read the response
+	data, err := io.ReadAll(transport)
+	if err != nil {
+		return false, err
+	}
+
+	output := string(data)
+	return strings.Contains(output, "Success"), nil
+}
+
+// installUsingPush installs APK using traditional push + pm install method
+func (d *Device) installUsingPush(apkPath string) (bool, error) {
+	// Open the local APK file
+	file, err := os.Open(apkPath)
+	if err != nil {
+		return false, err
+	}
+	defer file.Close()
+
+	// Push to temporary location on device
+	tempPath := "/data/local/tmp/install.apk"
+	err = d.Push(file, tempPath, 0644)
+	if err != nil {
+		return false, err
+	}
+
+	// Install using pm install
+	output, err := d.RunCommand(fmt.Sprintf("pm install -r %s", tempPath))
+	if err != nil {
+		return false, err
+	}
+
+	// Clean up
+	d.RunCommand(fmt.Sprintf("rm -f %s", tempPath))
+
+	return strings.Contains(output, "Success"), nil
 }
 
 // InstallRemote installs an APK that's already on the device
