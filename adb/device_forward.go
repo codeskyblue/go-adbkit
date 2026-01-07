@@ -79,25 +79,23 @@ func (d *Device) Reverse(remote, local string) (bool, error) {
 	defer transport.Close()
 
 	cmd := fmt.Sprintf("reverse:forward:%s;%s", remote, local)
-	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
-		return false, err
-	}
-
-	status, err := transport.CheckStatus()
+	status, err := transport.SendCommand(cmd)
 	if err != nil {
 		return false, err
 	}
-	if status == StatusOkay {
-		status, err := transport.CheckStatus()
-		if err != nil {
-			return false, err
-		}
-		if status == StatusOkay {
-			return true, nil
-		}
+	if status != StatusOkay {
 		return false, fmt.Errorf("unexpected status: %s", status)
 	}
-	return false, fmt.Errorf("unexpected status: %s", status)
+
+	// Read second status
+	status, err = transport.CheckStatus()
+	if err != nil {
+		return false, err
+	}
+	if status != StatusOkay {
+		return false, fmt.Errorf("unexpected status: %s", status)
+	}
+	return true, nil
 }
 
 // ReverseRemove removes a reverse-forward on the device transport (reverse:killforward:remote)
@@ -138,13 +136,7 @@ func (d *Device) ListReverses() ([]ReverseEntry, error) {
 	}
 	defer transport.Close()
 
-	cmd := "reverse:list-forward"
-	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
-		return nil, err
-	}
-
-	// read reply
-	status, err := transport.CheckStatus()
+	status, err := transport.SendCommand("reverse:list-forward")
 	if err != nil {
 		return nil, fmt.Errorf("listReverses failed: %w", err)
 	}

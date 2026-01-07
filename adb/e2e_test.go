@@ -447,11 +447,10 @@ func TestE2E_DirectoryOperations(t *testing.T) {
 
 	// Create directory
 	t.Run("CreateDirectory", func(t *testing.T) {
-		conn, err := device.Shell(fmt.Sprintf("mkdir -p %s", testDir))
+		_, err := device.RunCommand(fmt.Sprintf("mkdir -p %s", testDir))
 		if err != nil {
 			t.Fatalf("Failed to create directory: %v", err)
 		}
-		conn.Close()
 
 		// Verify directory exists
 		stat, err := device.Stat(testDir)
@@ -778,4 +777,3 @@ func TestE2E_PortForwarding(t *testing.T) {
 		t.Logf("Successfully removed reverse forward: %s", remoteSocket)
 	})
 }
-

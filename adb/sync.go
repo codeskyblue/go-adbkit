@@ -363,29 +363,5 @@ func readBytes(conn net.Conn, n int) ([]byte, error) {
 
 // openSyncService opens a sync service connection for the device
 func (d *Device) openSyncService() (net.Conn, error) {
-	// Get device transport
-	transport, err := d.Transport()
-	if err != nil {
-		return nil, err
-	}
-
-	// Send sync service command
-	cmd := "sync:"
-	length := fmt.Sprintf("%04x", len(cmd))
-	if _, err := transport.Write([]byte(length)); err != nil {
-		transport.Close()
-		return nil, err
-	}
-	if _, err := transport.Write([]byte(cmd)); err != nil {
-		transport.Close()
-		return nil, err
-	}
-
-	// Check status
-	if _, err := transport.CheckStatus(); err != nil {
-		transport.Close()
-		return nil, err
-	}
-
-	return transport, nil
+	return d.OpenTransportConnection("sync:")
 }

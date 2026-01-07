@@ -1,8 +1,6 @@
 package adb
 
 import (
-	"fmt"
-	"io"
 	"strings"
 )
 
@@ -22,35 +20,21 @@ type StartActivityOptions struct {
 
 // StartActivity starts an activity on the device
 func (d *Device) StartActivity(opts StartActivityOptions) (bool, error) {
-	transport, err := d.Transport()
+	args := buildActivityCommandArgs(opts, "am start")
+	command := strings.Join(args, " ")
+
+	output, err := d.RunCommand(command)
 	if err != nil {
 		return false, err
 	}
-	defer transport.Close()
 
-	cmd := buildActivityCommand(opts, "am start")
-	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
-		return false, err
+	// Handle user parameter retry
+	if strings.Contains(output, "No user") {
+		opts.User = 0
+		return d.StartActivity(opts)
 	}
 
-	reply := make([]byte, 4)
-	if _, err := transport.Read(reply); err != nil {
-		return false, err
-	}
-	if string(reply) == "OKAY" {
-		data, _ := io.ReadAll(transport)
-		output := string(data)
-		if strings.Contains(output, "No user") {
-			opts.User = 0
-			return d.StartActivity(opts)
-		}
-		return strings.Contains(output, "Error") == false, nil
-	}
-	if string(reply) == "FAIL" {
-		msg, _ := readLengthPrefixed(transport)
-		return false, fmt.Errorf("startActivity failed: %s", string(msg))
-	}
-	return false, fmt.Errorf("unexpected reply: %s", string(reply))
+	return !strings.Contains(output, "Error"), nil
 }
 
 // StartServiceOptions holds options for starting a service
@@ -65,44 +49,25 @@ type StartServiceOptions struct {
 
 // StartService starts a service on the device
 func (d *Device) StartService(opts StartServiceOptions) (bool, error) {
-	if opts.User == 0 && (opts.User == 0 || opts.User == -1) {
-	} else if opts.User == 0 {
-		opts.User = 0
-	}
+	args := buildServiceCommandArgs(opts, "am startservice")
+	command := strings.Join(args, " ")
 
-	transport, err := d.Transport()
+	output, err := d.RunCommand(command)
 	if err != nil {
 		return false, err
 	}
-	defer transport.Close()
 
-	cmd := buildServiceCommand(opts, "am startservice")
-	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
-		return false, err
+	// Handle user parameter retry
+	if strings.Contains(output, "--user") {
+		opts.User = -1
+		return d.StartService(opts)
 	}
 
-	reply := make([]byte, 4)
-	if _, err := transport.Read(reply); err != nil {
-		return false, err
-	}
-	if string(reply) == "OKAY" {
-		data, _ := io.ReadAll(transport)
-		output := string(data)
-		if strings.Contains(output, "--user") {
-			opts.User = -1
-			return d.StartService(opts)
-		}
-		return strings.Contains(output, "Error") == false, nil
-	}
-	if string(reply) == "FAIL" {
-		msg, _ := readLengthPrefixed(transport)
-		return false, fmt.Errorf("startService failed: %s", string(msg))
-	}
-	return false, fmt.Errorf("unexpected reply: %s", string(reply))
+	return !strings.Contains(output, "Error"), nil
 }
 
-// buildActivityCommand builds the activity manager command
-func buildActivityCommand(opts StartActivityOptions, baseCmd string) string {
+// buildActivityCommandArgs builds the activity command arguments as a string slice
+func buildActivityCommandArgs(opts StartActivityOptions, baseCmd string) []string {
 	args := []string{baseCmd}
 
 	if opts.Action != "" {
@@ -141,40 +106,32 @@ func buildActivityCommand(opts StartActivityOptions, baseCmd string) string {
 		args = append(args, "-D")
 	}
 
-	return fmt.Sprintf("shell:%s", strings.Join(args, " "))
+	return args
 }
 
-// buildServiceCommand builds the service start command
-func buildServiceCommand(opts StartServiceOptions, baseCmd string) string {
-	var buf strings.Builder
-	buf.WriteString(baseCmd)
+// buildServiceCommandArgs builds the service command arguments as a string slice
+func buildServiceCommandArgs(opts StartServiceOptions, baseCmd string) []string {
+	args := []string{baseCmd}
 
 	if opts.Action != "" {
-		buf.WriteString(" -a ")
-		buf.WriteString(opts.Action)
+		args = append(args, "-a", opts.Action)
 	}
 
 	if opts.Data != "" {
-		buf.WriteString(" -d ")
-		buf.WriteString(opts.Data)
+		args = append(args, "-d", opts.Data)
 	}
 
 	if opts.Type != "" {
-		buf.WriteString(" -t ")
-		buf.WriteString(opts.Type)
+		args = append(args, "-t", opts.Type)
 	}
 
 	if opts.Component != "" {
-		buf.WriteString(" -n ")
-		buf.WriteString(opts.Component)
+		args = append(args, "-n", opts.Component)
 	}
 
 	for key, val := range opts.Extras {
-		buf.WriteString(" --es ")
-		buf.WriteString(key)
-		buf.WriteString(" ")
-		buf.WriteString(val)
+		args = append(args, "--es", key, val)
 	}
 
-	return fmt.Sprintf("shell:%s", buf.String())
+	return args
 }

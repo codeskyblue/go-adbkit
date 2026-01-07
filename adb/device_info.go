@@ -2,7 +2,6 @@ package adb
 
 import (
 	"fmt"
-	"io"
 	"net"
 	"strings"
 	"time"
@@ -89,87 +88,27 @@ func (d *Device) DHCPIpAddress(iface string) (string, error) {
 
 // Reboot reboots the device
 func (d *Device) Reboot() (bool, error) {
-	transport, err := d.Transport()
-	if err != nil {
-		return false, err
-	}
-	defer transport.Close()
-
-	cmd := "reboot:"
-	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
-		return false, err
-	}
-
-	reply := make([]byte, 4)
-	if _, err := transport.Read(reply); err != nil {
-		return false, err
-	}
-	if string(reply) == "OKAY" {
-		io.ReadAll(transport)
-		return true, nil
-	}
-	if string(reply) == "FAIL" {
-		msg, _ := readLengthPrefixed(transport)
-		return false, fmt.Errorf("reboot failed: %s", string(msg))
-	}
-	return false, fmt.Errorf("unexpected reply: %s", string(reply))
+	err := d.ExecuteTransportCommand("reboot:")
+	return err == nil, err
 }
 
 // Remount remounts the device filesystem as read-write
 func (d *Device) Remount() (bool, error) {
-	transport, err := d.Transport()
-	if err != nil {
-		return false, err
-	}
-	defer transport.Close()
-
-	cmd := "remount:"
-	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
-		return false, err
-	}
-	reply := make([]byte, 4)
-	if _, err := transport.Read(reply); err != nil {
-		return false, err
-	}
-	if string(reply) == "OKAY" {
-		return true, nil
-	}
-	if string(reply) == "FAIL" {
-		msg, _ := readLengthPrefixed(transport)
-		return false, fmt.Errorf("remount failed: %s", string(msg))
-	}
-	return false, fmt.Errorf("unexpected reply: %s", string(reply))
+	err := d.ExecuteTransportCommand("remount:")
+	return err == nil, err
 }
 
 // Root attempts to restart adbd as root
 func (d *Device) Root() (bool, error) {
-	transport, err := d.Transport()
+	data, err := d.ExecuteTransportCommandWithResponse("root:")
 	if err != nil {
 		return false, err
 	}
-	defer transport.Close()
-
-	cmd := "root:"
-	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
-		return false, err
+	out := string(data)
+	if strings.Contains(out, "restarting adbd as root") {
+		return true, nil
 	}
-	reply := make([]byte, 4)
-	if _, err := transport.Read(reply); err != nil {
-		return false, err
-	}
-	if string(reply) == "OKAY" {
-		data, _ := io.ReadAll(transport)
-		out := string(data)
-		if strings.Contains(out, "restarting adbd as root") {
-			return true, nil
-		}
-		return false, fmt.Errorf("%s", strings.TrimSpace(out))
-	}
-	if string(reply) == "FAIL" {
-		msg, _ := readLengthPrefixed(transport)
-		return false, fmt.Errorf("root failed: %s", string(msg))
-	}
-	return false, fmt.Errorf("unexpected reply: %s", string(reply))
+	return false, fmt.Errorf("%s", strings.TrimSpace(out))
 }
 
 // WaitForDevice waits for the device to be available
@@ -202,58 +141,16 @@ func (d *Device) WaitForDeviceWithTimeout(timeout time.Duration) error {
 
 // WaitBootComplete waits for the device to finish booting
 func (d *Device) WaitBootComplete() (bool, error) {
-	transport, err := d.Transport()
+	data, err := d.ExecuteTransportCommandWithResponse("shell:getprop sys.boot_completed")
 	if err != nil {
 		return false, err
 	}
-	defer transport.Close()
-
-	cmd := "shell:getprop sys.boot_completed"
-	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
-		return false, err
-	}
-
-	reply := make([]byte, 4)
-	if _, err := transport.Read(reply); err != nil {
-		return false, err
-	}
-	if string(reply) == "OKAY" {
-		data, _ := io.ReadAll(transport)
-		return strings.Contains(string(data), "1"), nil
-	}
-	if string(reply) == "FAIL" {
-		msg, _ := readLengthPrefixed(transport)
-		return false, fmt.Errorf("waitBootComplete failed: %s", string(msg))
-	}
-	return false, fmt.Errorf("unexpected reply: %s", string(reply))
+	return strings.Contains(string(data), "1"), nil
 }
 
 // TrackJdwp starts tracking jdwp pids
 func (d *Device) TrackJdwp() (net.Conn, error) {
-	transport, err := d.Transport()
-	if err != nil {
-		return nil, err
-	}
-	cmd := "track-jdwp"
-	if _, err := transport.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
-		transport.Close()
-		return nil, err
-	}
-	reply := make([]byte, 4)
-	if _, err := transport.Read(reply); err != nil {
-		transport.Close()
-		return nil, err
-	}
-	if string(reply) == "OKAY" {
-		return transport, nil
-	}
-	if string(reply) == "FAIL" {
-		msg, _ := readLengthPrefixed(transport)
-		transport.Close()
-		return nil, fmt.Errorf("track-jdwp failed: %s", string(msg))
-	}
-	transport.Close()
-	return nil, fmt.Errorf("unexpected reply: %s", string(reply))
+	return d.OpenTransportConnection("track-jdwp")
 }
 
 // getAttribute returns the first message returned by the server
