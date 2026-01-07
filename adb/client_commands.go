@@ -21,7 +21,7 @@ func (c *Client) SendHostCommand(cmd string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if status == "FAIL" {
+	if status == StatusFail {
 		// read error payload
 		payload, _ := readLengthPrefixed(conn)
 		return nil, fmt.Errorf("adb server FAIL: %s", string(payload))
@@ -137,7 +137,7 @@ func (c *Client) TrackDevices() (net.Conn, error) {
 		conn.Close()
 		return nil, err
 	}
-	if status != "OKAY" {
+	if status != StatusOkay {
 		payload, _ := readLengthPrefixed(conn)
 		conn.Close()
 		return nil, fmt.Errorf("trackDevices failed: %s", string(payload))

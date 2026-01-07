@@ -21,13 +21,13 @@ func (d *Device) Forward(local, remote string) (bool, error) {
 
 	transport := NewTransport(conn)
 	// read first reply
-	status, err := transport.CheckStatus()
+	status, err := transport.ReadStatus()
 	if err != nil {
 		return false, err
 	}
 	if status == StatusOkay {
 		// read second reply
-		status, err := transport.CheckStatus()
+		status, err := transport.ReadStatus()
 		if err != nil {
 			return false, err
 		}
@@ -53,12 +53,12 @@ func (d *Device) ForwardRemove(local string) (bool, error) {
 	}
 
 	transport := NewTransport(conn)
-	status, err := transport.CheckStatus()
+	status, err := transport.ReadStatus()
 	if err != nil {
 		return false, err
 	}
 	if status == StatusOkay {
-		status, err := transport.CheckStatus()
+		status, err := transport.ReadStatus()
 		if err != nil {
 			return false, err
 		}
@@ -88,7 +88,7 @@ func (d *Device) Reverse(remote, local string) (bool, error) {
 	}
 
 	// Read second status
-	status, err = transport.CheckStatus()
+	status, err = transport.ReadStatus()
 	if err != nil {
 		return false, err
 	}
@@ -111,12 +111,12 @@ func (d *Device) ReverseRemove(remote string) (bool, error) {
 		return false, err
 	}
 
-	status, err := transport.CheckStatus()
+	status, err := transport.ReadStatus()
 	if err != nil {
 		return false, err
 	}
 	if status == StatusOkay {
-		status, err := transport.CheckStatus()
+		status, err := transport.ReadStatus()
 		if err != nil {
 			return false, err
 		}

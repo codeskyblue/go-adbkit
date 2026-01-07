@@ -109,7 +109,7 @@ func (d *Device) installUsingAbbExec(apkPath string) (bool, error) {
 		return false, err
 	}
 
-	if string(reply) != "OKAY" {
+	if string(reply) != StatusOkay {
 		msg, _ := readLengthPrefixed(transport)
 		return false, fmt.Errorf("abb_exec command failed: %s", string(msg))
 	}

@@ -49,9 +49,9 @@ func (t *Transport) Read(p []byte) (n int, err error) {
 	return t.Conn.Read(p)
 }
 
-// CheckStatus reads a 4-byte status and returns an error if it's a failure
+// ReadStatus reads a 4-byte status and returns an error if it's a failure
 // Returns the status string, and for failure status, also reads and returns the error message
-func (t *Transport) CheckStatus() (string, error) {
+func (t *Transport) ReadStatus() (string, error) {
 	statusBuf := make([]byte, 4)
 	if _, err := io.ReadFull(t, statusBuf); err != nil {
 		return "", err
@@ -67,10 +67,10 @@ func (t *Transport) CheckStatus() (string, error) {
 	return status, nil
 }
 
-// CheckStatusSuccess reads a 4-byte status and ensures it's StatusSuccess
-// Returns an error if the status is not StatusSuccess
-func (t *Transport) CheckStatusSuccess() error {
-	status, err := t.CheckStatus()
+// ValidateOkayStatus reads a 4-byte status and ensures it's StatusOkay
+// Returns an error if the status is not StatusOkay
+func (t *Transport) ValidateOkayStatus() error {
+	status, err := t.ReadStatus()
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func (t *Transport) SendCommand(cmd string) (string, error) {
 	if _, err := t.Write([]byte(fmt.Sprintf("%04x%s", len(cmd), cmd))); err != nil {
 		return "", err
 	}
-	return t.CheckStatus()
+	return t.ReadStatus()
 }
 
 // ExecuteSimpleCommand executes a command that expects OKAY/FAIL response
