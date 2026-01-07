@@ -56,7 +56,12 @@ func (c *Client) Version() (int, error) {
 }
 
 // Connect connects to a remote adb device (host:connect:host:port)
-func (c *Client) Connect(host string, port int) (string, error) {
+// Accepts host:port format (e.g., "192.168.1.100:5555")
+func (c *Client) Connect(hostPort string) (string, error) {
+	host, port, err := ParseHostPort(hostPort, 5555)
+	if err != nil {
+		return "", err
+	}
 	cmd := fmt.Sprintf("host:connect:%s:%d", host, port)
 	payload, err := c.SendHostCommand(cmd)
 	if err != nil {
@@ -66,7 +71,12 @@ func (c *Client) Connect(host string, port int) (string, error) {
 }
 
 // Disconnect disconnects a remote adb device (host:disconnect:host:port)
-func (c *Client) Disconnect(host string, port int) (string, error) {
+// Accepts host:port format (e.g., "192.168.1.100:5555")
+func (c *Client) Disconnect(hostPort string) (string, error) {
+	host, port, err := ParseHostPort(hostPort, 5555)
+	if err != nil {
+		return "", err
+	}
 	cmd := fmt.Sprintf("host:disconnect:%s:%d", host, port)
 	payload, err := c.SendHostCommand(cmd)
 	if err != nil {
@@ -189,24 +199,6 @@ func (c *Client) KillServer() (bool, error) {
 	}
 	// If we get here, the command was sent successfully
 	return len(payload) == 0, nil
-}
-
-// ConnectWithHostPort connects with host:port format support
-func (c *Client) ConnectWithHostPort(hostPort string) (string, error) {
-	host, port, err := ParseHostPort(hostPort, 5555)
-	if err != nil {
-		return "", err
-	}
-	return c.Connect(host, port)
-}
-
-// DisconnectWithHostPort disconnects with host:port format support
-func (c *Client) DisconnectWithHostPort(hostPort string) (string, error) {
-	host, port, err := ParseHostPort(hostPort, 5555)
-	if err != nil {
-		return "", err
-	}
-	return c.Disconnect(host, port)
 }
 
 // ParseHostPort parses a host:port string

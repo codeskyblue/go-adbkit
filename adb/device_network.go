@@ -13,7 +13,7 @@ func (d *Device) TcpIp(port int) (bool, error) {
 		port = 5555
 	}
 	cmd := fmt.Sprintf("tcpip:%d", port)
-	data, err := d.ExecuteTransportCommandWithResponse(cmd)
+	data, err := d.executeTransportCommandWithResponse(cmd)
 	if err != nil {
 		return false, err
 	}
@@ -22,20 +22,20 @@ func (d *Device) TcpIp(port int) (bool, error) {
 
 // Usb switches the device back to USB mode
 func (d *Device) Usb() (bool, error) {
-	err := d.ExecuteTransportCommand("usb:")
+	err := d.executeTransportCommand("usb:")
 	return err == nil, err
 }
 
 // OpenLocal opens a local file/abstract socket on the device
 func (d *Device) OpenLocal(path string) (net.Conn, error) {
 	cmd := fmt.Sprintf("local:%s", path)
-	return d.OpenTransportConnection(cmd)
+	return d.openTransportConnection(cmd)
 }
 
 // OpenLog opens a log buffer on the device
 func (d *Device) OpenLog(name string) (net.Conn, error) {
 	cmd := fmt.Sprintf("log:%s", name)
-	return d.OpenTransportConnection(cmd)
+	return d.openTransportConnection(cmd)
 }
 
 // OpenSocket opens a socket connection to a specific address on the device

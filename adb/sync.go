@@ -363,5 +363,5 @@ func readBytes(conn net.Conn, n int) ([]byte, error) {
 
 // openSyncService opens a sync service connection for the device
 func (d *Device) openSyncService() (net.Conn, error) {
-	return d.OpenTransportConnection("sync:")
+	return d.openTransportConnection("sync:")
 }

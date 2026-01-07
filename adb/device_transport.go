@@ -115,8 +115,8 @@ func (t *Transport) ExecuteCommandWithResponse(cmd string) ([]byte, error) {
 	return io.ReadAll(t)
 }
 
-// ExecuteTransportCommand executes a simple command with automatic transport lifecycle management
-func (d *Device) ExecuteTransportCommand(cmd string) error {
+// executeTransportCommand executes a simple command with automatic transport lifecycle management
+func (d *Device) executeTransportCommand(cmd string) error {
 	transport, err := d.Transport()
 	if err != nil {
 		return err
@@ -126,8 +126,8 @@ func (d *Device) ExecuteTransportCommand(cmd string) error {
 	return transport.ExecuteSimpleCommand(cmd)
 }
 
-// ExecuteTransportCommandWithResponse executes a command and returns response
-func (d *Device) ExecuteTransportCommandWithResponse(cmd string) ([]byte, error) {
+// executeTransportCommandWithResponse executes a command and returns response
+func (d *Device) executeTransportCommandWithResponse(cmd string) ([]byte, error) {
 	transport, err := d.Transport()
 	if err != nil {
 		return nil, err
@@ -137,9 +137,9 @@ func (d *Device) ExecuteTransportCommandWithResponse(cmd string) ([]byte, error)
 	return transport.ExecuteCommandWithResponse(cmd)
 }
 
-// OpenTransportConnection opens a transport connection for long-running operations
+// openTransportConnection opens a transport connection for long-running operations
 // The caller is responsible for closing the connection
-func (d *Device) OpenTransportConnection(cmd string) (*Transport, error) {
+func (d *Device) openTransportConnection(cmd string) (*Transport, error) {
 	transport, err := d.Transport()
 	if err != nil {
 		return nil, err

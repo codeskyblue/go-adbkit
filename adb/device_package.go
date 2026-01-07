@@ -161,7 +161,7 @@ func (d *Device) installUsingPush(apkPath string) (bool, error) {
 // InstallRemote installs an APK that's already on the device
 func (d *Device) InstallRemote(apkPath string) (bool, error) {
 	cmd := fmt.Sprintf("shell:pm install -r %s", apkPath)
-	data, err := d.ExecuteTransportCommandWithResponse(cmd)
+	data, err := d.executeTransportCommandWithResponse(cmd)
 	if err != nil {
 		return false, err
 	}
@@ -173,7 +173,7 @@ func (d *Device) InstallRemote(apkPath string) (bool, error) {
 // Uninstall uninstalls a package from the device
 func (d *Device) Uninstall(pkg string) (bool, error) {
 	cmd := fmt.Sprintf("shell:pm uninstall %s", pkg)
-	data, err := d.ExecuteTransportCommandWithResponse(cmd)
+	data, err := d.executeTransportCommandWithResponse(cmd)
 	if err != nil {
 		return false, err
 	}
@@ -183,7 +183,7 @@ func (d *Device) Uninstall(pkg string) (bool, error) {
 // IsInstalled checks if a package is installed
 func (d *Device) IsInstalled(pkg string) (bool, error) {
 	cmd := fmt.Sprintf("shell:pm path %s", pkg)
-	data, err := d.ExecuteTransportCommandWithResponse(cmd)
+	data, err := d.executeTransportCommandWithResponse(cmd)
 	if err != nil {
 		return false, err
 	}

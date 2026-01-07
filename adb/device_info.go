@@ -34,7 +34,6 @@ func (d *Device) State() (string, error) {
 	return strings.TrimSpace(attr), nil
 }
 
-
 // parseGetpropOutput parses the output from getprop command into a map
 func parseGetpropOutput(output string) map[string]string {
 	props := make(map[string]string)
@@ -88,19 +87,19 @@ func (d *Device) DHCPIpAddress(iface string) (string, error) {
 
 // Reboot reboots the device
 func (d *Device) Reboot() (bool, error) {
-	err := d.ExecuteTransportCommand("reboot:")
+	err := d.executeTransportCommand("reboot:")
 	return err == nil, err
 }
 
 // Remount remounts the device filesystem as read-write
 func (d *Device) Remount() (bool, error) {
-	err := d.ExecuteTransportCommand("remount:")
+	err := d.executeTransportCommand("remount:")
 	return err == nil, err
 }
 
 // Root attempts to restart adbd as root
 func (d *Device) Root() (bool, error) {
-	data, err := d.ExecuteTransportCommandWithResponse("root:")
+	data, err := d.executeTransportCommandWithResponse("root:")
 	if err != nil {
 		return false, err
 	}
@@ -141,7 +140,7 @@ func (d *Device) WaitForDeviceWithTimeout(timeout time.Duration) error {
 
 // WaitBootComplete waits for the device to finish booting
 func (d *Device) WaitBootComplete() (bool, error) {
-	data, err := d.ExecuteTransportCommandWithResponse("shell:getprop sys.boot_completed")
+	data, err := d.executeTransportCommandWithResponse("shell:getprop sys.boot_completed")
 	if err != nil {
 		return false, err
 	}
@@ -150,7 +149,7 @@ func (d *Device) WaitBootComplete() (bool, error) {
 
 // TrackJdwp starts tracking jdwp pids
 func (d *Device) TrackJdwp() (net.Conn, error) {
-	return d.OpenTransportConnection("track-jdwp")
+	return d.openTransportConnection("track-jdwp")
 }
 
 // getAttribute returns the first message returned by the server
