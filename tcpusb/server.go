@@ -92,6 +92,7 @@ func (srv *Server) Listen(address string) error {
 // Close closes the server
 func (srv *Server) Close() error {
 	srv.mu.Lock()
+	
 	if srv.closed {
 		srv.mu.Unlock()
 		return nil
