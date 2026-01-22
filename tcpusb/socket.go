@@ -100,15 +100,20 @@ func (s *Socket) Start() error {
 // End closes the socket and all services
 func (s *Socket) End() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if s.ended {
+		s.mu.Unlock()
 		return
 	}
 
-	s.services.End()
-	s.conn.Close()
 	s.ended = true
+	services := s.services
+	conn := s.conn
+	s.mu.Unlock()
+
+	// End services without holding the lock to avoid deadlock
+	// Service.End() calls socket.Write() which needs to check s.ended
+	services.End()
+	conn.Close()
 }
 
 // Write writes data to the socket
