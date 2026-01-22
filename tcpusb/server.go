@@ -66,6 +66,13 @@ func (srv *Server) Listen(address string) error {
 		go func() {
 			defer func() {
 				srv.mu.Lock()
+				defer srv.mu.Unlock()
+				
+				// Skip cleanup if server is already closed
+				if srv.closed {
+					return
+				}
+				
 				// Remove from connections
 				for i, s := range srv.connections {
 					if s == socket {
@@ -73,7 +80,6 @@ func (srv *Server) Listen(address string) error {
 						break
 					}
 				}
-				srv.mu.Unlock()
 			}()
 
 			if err := socket.Start(); err != nil {
