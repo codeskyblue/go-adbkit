@@ -86,23 +86,29 @@ func (srv *Server) Listen(address string) error {
 // Close closes the server
 func (srv *Server) Close() error {
 	srv.mu.Lock()
-	defer srv.mu.Unlock()
-
 	if srv.closed {
+		srv.mu.Unlock()
 		return nil
 	}
 
 	srv.closed = true
 
-	// Close all connections
-	for _, conn := range srv.connections {
-		conn.End()
-	}
+	// Copy connections to avoid holding lock while closing
+	connections := make([]*Socket, len(srv.connections))
+	copy(connections, srv.connections)
 	srv.connections = nil
 
+	listener := srv.listener
+	srv.mu.Unlock()
+
+	// Close all connections without holding the lock
+	for _, conn := range connections {
+		conn.End()
+	}
+
 	// Close listener
-	if srv.listener != nil {
-		return srv.listener.Close()
+	if listener != nil {
+		return listener.Close()
 	}
 
 	return nil
