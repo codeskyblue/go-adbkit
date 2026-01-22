@@ -100,7 +100,6 @@ func (s *Socket) Start() error {
 // End closes the socket and all services
 func (s *Socket) End() {
 	s.mu.Lock()
-	
 	if s.ended {
 		s.mu.Unlock()
 		return
