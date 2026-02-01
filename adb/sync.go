@@ -210,6 +210,16 @@ func (s *SyncService) Pull(filePath string) (io.ReadCloser, error) {
 	return pr, nil
 }
 
+// OpenFile opens a file and returns its content as a byte slice
+func (s *SyncService) OpenFile(filePath string) ([]byte, error) {
+	reader, err := s.Pull(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+	return io.ReadAll(reader)
+}
+
 // writeData writes data to the device
 func (s *SyncService) writeData(data []byte, timestamp uint32) error {
 	offset := 0
@@ -336,11 +346,6 @@ func (s *SyncService) sendCommandWithArg(cmd string, arg string) error {
 
 	_, err := s.conn.Write(payload)
 	return err
-}
-
-// TempPath returns the temporary path for a file
-func (s *SyncService) TempPath(filePath string) string {
-	return fmt.Sprintf("%s/%s", TEMP_PATH, path.Base(filePath))
 }
 
 // readAscii reads ASCII bytes from connection

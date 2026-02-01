@@ -122,6 +122,13 @@ if err != nil {
 defer localFile.Close()
 _, err = io.Copy(localFile, reader)
 
+// Open file and read all content
+data, err := device.OpenFile("/sdcard/file.txt")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("File content: %s\n", string(data))
+
 // Push file to device
 file, err := os.Open("local_file.txt")
 if err != nil {
@@ -461,6 +468,7 @@ output, err := device.RunCommand("ls /sdcard")
 stat, err := device.Stat("/sdcard/file.txt")
 entries, err := device.Readdir("/sdcard/")
 reader, err := device.Pull("/sdcard/file.txt")
+data, err := device.OpenFile("/sdcard/file.txt") // Read entire file
 // Push requires io.Reader and file mode
 file, _ := os.Open("local.txt")
 err = device.Push(file, "/sdcard/file.txt", 0644)
@@ -529,6 +537,13 @@ if err != nil {
     log.Fatal(err)
 }
 defer reader.Close()
+
+// Open file and read all content
+data, err := sync.OpenFile("/sdcard/file.txt")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Content: %s\n", string(data))
 
 // Push file with options
 file, _ := os.Open("local.txt")

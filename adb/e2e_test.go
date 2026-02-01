@@ -179,6 +179,18 @@ func TestE2E_PushPull(t *testing.T) {
 		}
 	})
 
+	// Test OpenFile
+	t.Run("OpenFile", func(t *testing.T) {
+		content, err := device.OpenFile(remotePath)
+		if err != nil {
+			t.Fatalf("Failed to open file: %v", err)
+		}
+
+		if !bytes.Equal(content, testContent) {
+			t.Errorf("OpenFile content mismatch.\nGot: %q\nWant: %q", content, testContent)
+		}
+	})
+
 	// Cleanup: Remove the test file from device
 	t.Cleanup(func() {
 		conn, _ := device.Shell(fmt.Sprintf("rm -f %s", remotePath))
