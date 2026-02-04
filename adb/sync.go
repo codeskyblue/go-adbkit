@@ -209,8 +209,8 @@ func (s *SyncService) Pull(filePath string) (io.ReadCloser, error) {
 	return pr, nil
 }
 
-// OpenFile opens a file and returns its content as a byte slice
-func (s *SyncService) OpenFile(filePath string) ([]byte, error) {
+// ReadFile reads a file and returns its content as a byte slice
+func (s *SyncService) ReadFile(filePath string) ([]byte, error) {
 	reader, err := s.Pull(filePath)
 	if err != nil {
 		return nil, err

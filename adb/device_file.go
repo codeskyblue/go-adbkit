@@ -60,12 +60,12 @@ func (d *Device) Push(reader io.Reader, path string, mode uint32) error {
 	return syncService.Push(reader, path, opts)
 }
 
-// OpenFile opens a file on the device and returns its content as a byte slice
-func (d *Device) OpenFile(path string) ([]byte, error) {
+// ReadFile reads a file on the device and returns its content as a byte slice
+func (d *Device) ReadFile(path string) ([]byte, error) {
 	syncService, err := d.NewSyncService()
 	if err != nil {
 		return nil, err
 	}
 	defer syncService.Close()
-	return syncService.OpenFile(path)
+	return syncService.ReadFile(path)
 }

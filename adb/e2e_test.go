@@ -179,15 +179,15 @@ func TestE2E_PushPull(t *testing.T) {
 		}
 	})
 
-	// Test OpenFile
-	t.Run("OpenFile", func(t *testing.T) {
-		content, err := device.OpenFile(remotePath)
+	// Test ReadFile
+	t.Run("ReadFile", func(t *testing.T) {
+		content, err := device.ReadFile(remotePath)
 		if err != nil {
-			t.Fatalf("Failed to open file: %v", err)
+			t.Fatalf("Failed to read file: %v", err)
 		}
 
 		if !bytes.Equal(content, testContent) {
-			t.Errorf("OpenFile content mismatch.\nGot: %q\nWant: %q", content, testContent)
+			t.Errorf("ReadFile content mismatch.\nGot: %q\nWant: %q", content, testContent)
 		}
 	})
 
