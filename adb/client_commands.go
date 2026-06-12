@@ -34,6 +34,11 @@ func (c *Client) SendHostCommandContext(ctx context.Context, cmd string) ([]byte
 
 	payload, err := readLengthPrefixed(conn)
 	if err != nil {
+		// Network errors (timeout, connection closed) should propagate,
+		// parse errors (not a valid length prefix) fall through to raw read.
+		if _, ok := err.(net.Error); ok {
+			return nil, err
+		}
 		rest, _ := io.ReadAll(conn)
 		return rest, nil
 	}
@@ -83,9 +88,9 @@ func (c *Client) ConnectContext(ctx context.Context, hostPort string) (string, e
 
 // Connect connects to a remote adb device (host:connect:host:port)
 // Accepts host:port format (e.g., "192.168.1.100:5555")
-// Uses a 30-second timeout by default
+// Uses a 5-second timeout by default
 func (c *Client) Connect(hostPort string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return c.ConnectContext(ctx, hostPort)
 }

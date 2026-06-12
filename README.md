@@ -364,7 +364,7 @@ devices, err := client.ListDevices()
 devices, err := client.ListDevicesWithPaths()
 // Returns: []DeviceWithPath{Serial, State, Model, Device}
 
-// Connect to remote device (30s default timeout)
+// Connect to remote device (5s default timeout)
 msg, err := client.Connect("192.168.1.100:5555")
 
 // Connect to remote device with custom timeout
