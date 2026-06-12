@@ -33,6 +33,9 @@ func (c *Client) SendHostCommandContext(ctx context.Context, cmd string) ([]byte
 
 	status, err := sendADBCommand(conn, cmd)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return nil, err
 	}
 	if status == StatusFail {
