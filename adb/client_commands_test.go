@@ -1,6 +1,85 @@
 package adb
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net"
+	"testing"
+	"time"
+)
+
+type blockingConnector struct{}
+
+func (blockingConnector) ConnectionContext(ctx context.Context) (net.Conn, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func newHostCommandTestClient(command, payload string) *TestClient {
+	req := []byte(fmt.Sprintf("%04x%s", len(command), command))
+	resp := []byte(fmt.Sprintf("OKAY%04x%s", len(payload), payload))
+	conn := newMockConn([]Packet{
+		{IsRequest: true, Data: req},
+		{IsRequest: false, Data: resp},
+	})
+	return &TestClient{
+		Client: NewClientWithConnector(&mockConnector{conn: conn}),
+		Conn:   conn,
+	}
+}
+
+func TestConnectContext(t *testing.T) {
+	client := newHostCommandTestClient("host:connect:192.168.1.100:5555", "ok")
+
+	got, err := client.ConnectContext(context.Background(), "192.168.1.100")
+	if err != nil {
+		t.Fatalf("ConnectContext() error = %v", err)
+	}
+	if err := client.Conn.CheckRequest(); err != nil {
+		t.Fatalf("CheckRequest error = %v", err)
+	}
+	if got != "ok" {
+		t.Fatalf("ConnectContext() = %q, want %q", got, "ok")
+	}
+}
+
+func TestDisconnectContext(t *testing.T) {
+	client := newHostCommandTestClient("host:disconnect:192.168.1.100:5555", "ok")
+
+	got, err := client.DisconnectContext(context.Background(), "192.168.1.100")
+	if err != nil {
+		t.Fatalf("DisconnectContext() error = %v", err)
+	}
+	if err := client.Conn.CheckRequest(); err != nil {
+		t.Fatalf("CheckRequest error = %v", err)
+	}
+	if got != "ok" {
+		t.Fatalf("DisconnectContext() = %q, want %q", got, "ok")
+	}
+}
+
+func TestConnectContextCanceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	client := NewClientWithConnector(blockingConnector{})
+	_, err := client.ConnectContext(ctx, "192.168.1.100")
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("ConnectContext() error = %v, want %v", err, context.Canceled)
+	}
+}
+
+func TestDisconnectContextDeadlineExceeded(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	client := NewClientWithConnector(blockingConnector{})
+	_, err := client.DisconnectContext(ctx, "192.168.1.100")
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("DisconnectContext() error = %v, want %v", err, context.DeadlineExceeded)
+	}
+}
 
 func TestVersion(t *testing.T) {
 	testdata := `
