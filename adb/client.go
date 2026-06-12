@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
+	"time"
 )
 
 // Connector is an interface that abstracts connection creation for testability
@@ -23,6 +24,7 @@ type connectorImpl struct {
 
 func (c connectorImpl) ConnectionContext(ctx context.Context) (net.Conn, error) {
 	var d net.Dialer
+	d.Timeout = 3 * time.Second
 	return d.DialContext(ctx, "tcp", c.addr())
 }
 
