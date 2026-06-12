@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"image/png"
@@ -8,6 +9,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/codeskyblue/go-adbkit/adb"
 )
@@ -18,6 +20,8 @@ import (
 // $0 kill-server
 // $0 shell <command>
 // $0 screenshot [-s <serial>] [-o <output file>]
+// $0 connect <host[:port]>
+// $0 disconnect <host[:port]>
 // $0 push <local> <remote> [-s <serial>]
 // $0 pull <remote> <local> [-s <serial>]
 
@@ -41,6 +45,10 @@ func main() {
 		handleShell(client, os.Args[2:])
 	case "screenshot":
 		handleScreenshot(client, os.Args[2:])
+	case "connect":
+		handleConnect(client, os.Args[2:])
+	case "disconnect":
+		handleDisconnect(client, os.Args[2:])
 	case "push":
 		handlePush(client, os.Args[2:])
 	case "pull":
@@ -60,6 +68,8 @@ func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  basic devices                      - List connected devices")
 	fmt.Println("  basic kill-server                   - Kill ADB server")
+	fmt.Println("  basic connect [options] <host[:port]>  - Connect to a remote ADB device")
+	fmt.Println("  basic disconnect <host[:port]>     - Disconnect from a remote ADB device")
 	fmt.Println("  basic shell <command>              - Execute shell command")
 	fmt.Println("  basic screenshot [options]         - Take screenshot")
 	fmt.Println("  basic push <local> <remote> [opts]  - Push file to device")
@@ -80,6 +90,9 @@ func printUsage() {
 	fmt.Println("Examples:")
 	fmt.Println("  basic devices")
 	fmt.Println("  basic kill-server")
+	fmt.Println("  basic connect 192.168.1.100:5555")
+	fmt.Println("  basic connect 192.168.1.100         # Default port 5555")
+	fmt.Println("  basic disconnect 192.168.1.100:5555")
 	fmt.Println("  basic shell getprop ro.product.model")
 	fmt.Println("  basic shell -s emulator-5554 ls /sdcard")
 	fmt.Println("  basic screenshot                           # Auto-detect device")
@@ -149,6 +162,59 @@ func autoDetectDevice(client *adb.Client, serial *string) {
 	}
 
 	*serial = devices[0].Serial
+}
+
+func handleConnect(client *adb.Client, args []string) {
+	fs := flag.NewFlagSet("connect", flag.ExitOnError)
+	timeout := fs.Duration("t", 5*time.Second, "Connection timeout (e.g., 5s, 10s, 1m)")
+
+	if err := fs.Parse(args); err != nil {
+		log.Fatalf("Failed to parse arguments: %v", err)
+	}
+
+	hostArgs := fs.Args()
+	if len(hostArgs) == 0 {
+		fmt.Println("Error: host[:port] is required")
+		fmt.Println()
+		fs.Usage()
+		fmt.Println()
+		fmt.Println("Example: basic connect 192.168.1.100:5555")
+		fmt.Println("         basic connect -t 10s 192.168.1.100")
+		os.Exit(1)
+	}
+
+	hostPort := hostArgs[0]
+	fmt.Printf("Connecting to %s (timeout: %v)...\n", hostPort, *timeout)
+
+	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+	defer cancel()
+
+	msg, err := client.ConnectContext(ctx, hostPort)
+	if err != nil {
+		log.Fatalf("Failed to connect: %v", err)
+	}
+
+	fmt.Println(msg)
+}
+
+func handleDisconnect(client *adb.Client, args []string) {
+	if len(args) == 0 {
+		fmt.Println("Error: host[:port] is required")
+		fmt.Println()
+		fmt.Println("Example: basic disconnect 192.168.1.100:5555")
+		fmt.Println("         basic disconnect 192.168.1.100")
+		os.Exit(1)
+	}
+
+	hostPort := args[0]
+	fmt.Printf("Disconnecting from %s...\n", hostPort)
+
+	msg, err := client.Disconnect(hostPort)
+	if err != nil {
+		log.Fatalf("Failed to disconnect: %v", err)
+	}
+
+	fmt.Println(msg)
 }
 
 func handleShell(client *adb.Client, args []string) {

@@ -102,9 +102,9 @@ func (c *Client) ConnectContext(ctx context.Context, hostPort string) (string, e
 
 // Connect connects to a remote adb device (host:connect:host:port)
 // Accepts host:port format (e.g., "192.168.1.100:5555")
-// Uses a 5-second timeout by default
+// Uses a 60-second timeout by default
 func (c *Client) Connect(hostPort string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	return c.ConnectContext(ctx, hostPort)
 }
