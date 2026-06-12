@@ -1,40 +1,70 @@
 package adb
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"strconv"
 	"strings"
+	"time"
 )
 
-// SendHostCommand sends a "host:*" command to the adb server and returns the payload
-func (c *Client) SendHostCommand(cmd string) ([]byte, error) {
-	conn, err := c.Connection()
+// SendHostCommandContext sends a "host:*" command with context support (timeout, cancellation)
+func (c *Client) SendHostCommandContext(ctx context.Context, cmd string) ([]byte, error) {
+	conn, err := c.ConnectionContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	// keep connection open until we read the payload
 	defer conn.Close()
+
+	if done := ctx.Done(); done != nil {
+		go func() {
+			<-done
+			_ = conn.Close()
+		}()
+	}
+
+	if deadline, ok := ctx.Deadline(); ok {
+		if err := conn.SetDeadline(deadline); err != nil {
+			return nil, err
+		}
+	}
 
 	status, err := sendADBCommand(conn, cmd)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return nil, err
 	}
 	if status == StatusFail {
-		// read error payload
 		payload, _ := readLengthPrefixed(conn)
 		return nil, fmt.Errorf("adb server FAIL: %s", string(payload))
 	}
 
-	// OKAY — read length-prefixed payload(s). Most host commands send a single length-prefixed block.
 	payload, err := readLengthPrefixed(conn)
 	if err != nil {
-		// If there's no length, try to read raw remainder
+		// Network errors (timeout, connection closed) should propagate,
+		// parse errors (not a valid length prefix) fall through to raw read.
+		if _, ok := err.(net.Error); ok {
+			return nil, err
+		}
 		rest, _ := io.ReadAll(conn)
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return rest, nil
 	}
 	return payload, nil
+}
+
+// SendHostCommand sends a "host:*" command to the adb server and returns the payload
+// Uses a 30-second timeout by default
+func (c *Client) SendHostCommand(cmd string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return c.SendHostCommandContext(ctx, cmd)
 }
 
 // Version returns the adb server version as integer (as returned by host:version)
@@ -55,15 +85,39 @@ func (c *Client) Version() (int, error) {
 	return int(version), nil
 }
 
-// Connect connects to a remote adb device (host:connect:host:port)
+// ConnectContext connects to a remote adb device with context support (timeout, cancellation)
 // Accepts host:port format (e.g., "192.168.1.100:5555")
-func (c *Client) Connect(hostPort string) (string, error) {
+func (c *Client) ConnectContext(ctx context.Context, hostPort string) (string, error) {
 	host, port, err := ParseHostPort(hostPort, 5555)
 	if err != nil {
 		return "", err
 	}
 	cmd := fmt.Sprintf("host:connect:%s:%d", host, port)
-	payload, err := c.SendHostCommand(cmd)
+	payload, err := c.SendHostCommandContext(ctx, cmd)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(payload)), nil
+}
+
+// Connect connects to a remote adb device (host:connect:host:port)
+// Accepts host:port format (e.g., "192.168.1.100:5555")
+// Uses a 60-second timeout by default
+func (c *Client) Connect(hostPort string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	return c.ConnectContext(ctx, hostPort)
+}
+
+// DisconnectContext disconnects from a remote adb device with context support (timeout, cancellation)
+// Accepts host:port format (e.g., "192.168.1.100:5555")
+func (c *Client) DisconnectContext(ctx context.Context, hostPort string) (string, error) {
+	host, port, err := ParseHostPort(hostPort, 5555)
+	if err != nil {
+		return "", err
+	}
+	cmd := fmt.Sprintf("host:disconnect:%s:%d", host, port)
+	payload, err := c.SendHostCommandContext(ctx, cmd)
 	if err != nil {
 		return "", err
 	}
@@ -72,17 +126,11 @@ func (c *Client) Connect(hostPort string) (string, error) {
 
 // Disconnect disconnects a remote adb device (host:disconnect:host:port)
 // Accepts host:port format (e.g., "192.168.1.100:5555")
+// Uses a 30-second timeout by default
 func (c *Client) Disconnect(hostPort string) (string, error) {
-	host, port, err := ParseHostPort(hostPort, 5555)
-	if err != nil {
-		return "", err
-	}
-	cmd := fmt.Sprintf("host:disconnect:%s:%d", host, port)
-	payload, err := c.SendHostCommand(cmd)
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(payload)), nil
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return c.DisconnectContext(ctx, hostPort)
 }
 
 // ListDevices returns the list of attached devices (host:devices)

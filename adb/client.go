@@ -119,7 +119,7 @@ func NewClientWithOptions(opts ClientOptions) *Client {
 			if port, err := strconv.Atoi(portStr); err == nil {
 				opts.Port = port
 			}
-		} 
+		}
 	}
 	if opts.Bin == "" {
 		opts.Bin = defaultADBName()

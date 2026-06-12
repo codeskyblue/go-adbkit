@@ -275,7 +275,9 @@ if err != nil {
 }
 
 // Connect to device over TCP
-msg, err := client.Connect("192.168.1.100:5555")
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+msg, err := client.ConnectContext(ctx, "192.168.1.100:5555")
 if err != nil {
     log.Fatal(err)
 }
@@ -362,11 +364,21 @@ devices, err := client.ListDevices()
 devices, err := client.ListDevicesWithPaths()
 // Returns: []DeviceWithPath{Serial, State, Model, Device}
 
-// Connect to remote device
+// Connect to remote device (5s default timeout)
 msg, err := client.Connect("192.168.1.100:5555")
 
-// Disconnect from remote device
+// Connect to remote device with custom timeout
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+msg, err = client.ConnectContext(ctx, "192.168.1.100:5555")
+
+// Disconnect from remote device (30s default timeout)
 msg, err := client.Disconnect("192.168.1.100:5555")
+
+// Disconnect from remote device with custom timeout
+ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+msg, err = client.DisconnectContext(ctx, "192.168.1.100:5555")
 
 // Kill ADB server
 ok, err := client.KillServer()
