@@ -51,6 +51,9 @@ func (c *Client) SendHostCommandContext(ctx context.Context, cmd string) ([]byte
 			return nil, err
 		}
 		rest, _ := io.ReadAll(conn)
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return rest, nil
 	}
 	return payload, nil
