@@ -18,9 +18,17 @@ func (c *Client) SendHostCommandContext(ctx context.Context, cmd string) ([]byte
 	}
 	defer conn.Close()
 
+	if done := ctx.Done(); done != nil {
+		go func() {
+			<-done
+			_ = conn.Close()
+		}()
+	}
+
 	if deadline, ok := ctx.Deadline(); ok {
-		conn.SetDeadline(deadline)
-		defer conn.SetDeadline(time.Time{})
+		if err := conn.SetDeadline(deadline); err != nil {
+			return nil, err
+		}
 	}
 
 	status, err := sendADBCommand(conn, cmd)
