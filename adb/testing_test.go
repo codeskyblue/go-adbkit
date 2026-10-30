@@ -38,7 +38,6 @@ type mockConn struct {
 	lastCheckIndex int          // Packet index at last CheckRequest
 	readBuffer     bytes.Buffer // Buffer for reading data
 	writeBuffer    bytes.Buffer // Buffer for written data
-	closed         bool
 }
 
 // newMockConn creates a mock connection from packets
@@ -47,7 +46,6 @@ func newMockConn(packets []Packet) *mockConn {
 		packets:        packets,
 		packetIndex:    0,
 		lastCheckIndex: 0,
-		closed:         false,
 	}
 }
 
@@ -117,7 +115,6 @@ func (m *mockConn) Write(b []byte) (n int, err error) {
 }
 
 func (m *mockConn) Close() error {
-	m.closed = true
 	return nil
 }
 
