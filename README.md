@@ -10,7 +10,7 @@ A pure Go client library for the Android Debug Bridge (ADB) protocol.
 - **Pure Go Implementation**: No external dependencies on ADB binaries
 - **Comprehensive API Support**:
   - Host commands: version, devices, connect, disconnect, kill server
-  - Device commands: shell, properties, reboot, screenshot, screen orientation
+  - Device commands: shell, shell v2, properties, reboot, screenshot, screen orientation
   - Package management: list, install, uninstall, clear data, check installation
   - Intent management: start activities, start services
   - Network operations: TCP/IP mode, USB mode, socket connections
@@ -84,6 +84,61 @@ if err != nil {
     log.Fatal(err)
 }
 fmt.Printf("Device model: %s\n", output)
+```
+
+### Shell Protocol v2
+
+The shell protocol v2 keeps stdout and stderr separate and reports the remote
+exit code. `RunCommandV2` uses it automatically.
+
+```go
+device := client.Device("device-serial")
+
+// Check whether the device supports shell v2 before using it.
+supported, err := device.HasFeature("shell_v2")
+if err != nil {
+    log.Fatal(err)
+}
+
+// List all features advertised by the device.
+features, err := device.Features()
+
+result, err := device.RunCommandV2("ls /sdcard")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("stdout: %s\n", result.Stdout)
+fmt.Printf("stderr: %s\n", result.Stderr)
+fmt.Printf("exit code: %d\n", result.ExitCode)
+```
+
+For interactive sessions, open a session and use `Write` for stdin. Use
+`ShellV2WithOptions` to set `TERM` and allocate a PTY.
+
+```go
+session, err := device.ShellV2WithOptions("sh", adb.ShellV2Options{
+    Term: "xterm-256color",
+    PTY:  true,
+})
+if err != nil {
+    log.Fatal(err)
+}
+defer session.Close()
+
+// Send input to the remote shell.
+session.Write([]byte("echo hello\n"))
+
+// Read output (stdout and stderr are separate streams).
+go io.Copy(os.Stdout, session.Stdout())
+go io.Copy(os.Stderr, session.Stderr())
+
+// Notify the remote PTY when the terminal size changes.
+session.Resize(24, 80)
+
+// Close stdin to let commands that read until EOF finish.
+session.CloseStdin()
+
+exitCode, err := session.Wait()
 ```
 
 ### File Operations
@@ -475,6 +530,10 @@ data, err := adb.ReadAllFromConn(conn)
 
 // Or run command and get output directly
 output, err := device.RunCommand("ls /sdcard")
+
+// Shell v2: separate stdout/stderr and exit code
+result, err := device.RunCommandV2("ls /sdcard")
+session, err := device.ShellV2("sh")
 
 // File Operations
 stat, err := device.Stat("/sdcard/file.txt")

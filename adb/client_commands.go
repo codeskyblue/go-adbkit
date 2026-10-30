@@ -283,7 +283,8 @@ func (c *Client) ListForwards() ([]ForwardEntry, error) {
 	return forwards, nil
 }
 
-// Features retrieves the ADB server features (host:features)
+// Features retrieves the feature set of the device selected by the ADB server
+// (host:features). Use Device.Features to target a specific device explicitly.
 func (c *Client) Features() ([]string, error) {
 	payload, err := c.SendHostCommand("host:features")
 	if err != nil {

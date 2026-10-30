@@ -61,16 +61,7 @@ func (d *Device) Install(apkPath string) (bool, error) {
 
 // hasAbbExecFeature checks if the device supports abb_exec feature
 func (d *Device) hasAbbExecFeature() (bool, error) {
-	features, err := d.client.Features()
-	if err != nil {
-		return false, err
-	}
-	for _, f := range features {
-		if f == "abb_exec" {
-			return true, nil
-		}
-	}
-	return false, nil
+	return d.HasFeature("abb_exec")
 }
 
 // installUsingAbbExec installs APK using the abb_exec feature (streaming install)
